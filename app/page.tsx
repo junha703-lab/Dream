@@ -15,7 +15,7 @@ const jobs = [
     people: "2명 모집",
     time: "40분",
     pay: 300,
-    skills: ["창의성 +3", "의사소통 +1", "협업 +1"],
+    skills: ["창의적 사고 +3", "심미적 감성 +3", "협력적 소통 +1"],
   },
   {
     id: 2,
@@ -27,7 +27,7 @@ const jobs = [
     people: "3명 모집",
     time: "30분",
     pay: 250,
-    skills: ["정보활용 +3", "문제해결 +2", "협업 +1"],
+    skills: ["지식정보처리 +3", "창의적 사고 +1", "협력적 소통 +1"],
   },
   {
     id: 3,
@@ -39,7 +39,7 @@ const jobs = [
     people: "2명 모집",
     time: "35분",
     pay: 280,
-    skills: ["문제해결 +3", "창의성 +2", "협업 +1"],
+    skills: ["지식정보처리 +2", "창의적 사고 +2", "공동체 +2"],
   },
   {
     id: 4,
@@ -51,18 +51,62 @@ const jobs = [
     people: "2명 모집",
     time: "25분",
     pay: 220,
-    skills: ["의사소통 +3", "자기관리 +2"],
+    skills: ["지식정보처리 +2", "협력적 소통 +3", "자기관리 +1"],
   },
 ];
 
-const skillRows = [
-  ["문제해결", 58, "#7258d9"],
-  ["의사소통", 73, "#2a9d75"],
-  ["창의성", 65, "#f08a4b"],
-  ["협업", 70, "#3f7bd9"],
-  ["자기관리", 54, "#d75d88"],
-  ["정보활용", 61, "#8b6cc7"],
+const competencyDefinitions = [
+  {
+    name: "자기관리 역량",
+    short: "자기관리",
+    value: 54,
+    color: "#d75d88",
+    icon: "◉",
+    description: "자아정체성과 자신감을 가지고 자신의 삶과 진로를 스스로 설계하며, 필요한 기초 능력과 자질을 갖추어 자기주도적으로 살아가는 역량",
+  },
+  {
+    name: "지식정보처리 역량",
+    short: "지식정보처리",
+    value: 61,
+    color: "#8b6cc7",
+    icon: "▦",
+    description: "문제를 합리적으로 해결하기 위해 다양한 영역의 지식과 정보를 깊이 이해하고 비판적으로 탐구하며 활용하는 역량",
+  },
+  {
+    name: "창의적 사고 역량",
+    short: "창의적 사고",
+    value: 65,
+    color: "#f08a4b",
+    icon: "✦",
+    description: "폭넓은 기초 지식을 바탕으로 여러 분야의 지식·기술·경험을 융합적으로 활용하여 새로운 것을 창출하는 역량",
+  },
+  {
+    name: "심미적 감성 역량",
+    short: "심미적 감성",
+    value: 58,
+    color: "#e06f8f",
+    icon: "♡",
+    description: "인간에 대한 공감적 이해와 문화적 감수성을 바탕으로 삶의 의미와 가치를 성찰하고 향유하는 역량",
+  },
+  {
+    name: "협력적 소통 역량",
+    short: "협력적 소통",
+    value: 73,
+    color: "#2a9d75",
+    icon: "↔",
+    description: "다른 사람의 관점을 존중하고 경청하며 자신의 생각과 감정을 효과적으로 표현해 공동의 목적을 구현하는 역량",
+  },
+  {
+    name: "공동체 역량",
+    short: "공동체",
+    value: 70,
+    color: "#3f7bd9",
+    icon: "◎",
+    description: "개방적·포용적 가치와 태도로 지역·국가·세계 공동체의 지속 가능한 발전에 적극적이고 책임감 있게 참여하는 역량",
+  },
 ] as const;
+
+const skillRows = competencyDefinitions.map(({ short, value, color }) => [short, value, color] as const);
 
 const studentNav: { id: StudentView; label: string; icon: string }[] = [
   { id: "home", label: "오늘의 생활", icon: "⌂" },
@@ -157,14 +201,14 @@ function RadarCard() {
         <div className="radar-wrap" aria-label="역량 육각형 그래프">
           <div className="radar-grid grid-one" /><div className="radar-grid grid-two" /><div className="radar-grid grid-three" />
           <div className="radar-shape" />
-          <span className="radar-label top">의사소통</span><span className="radar-label tr">창의성</span><span className="radar-label br">협업</span>
-          <span className="radar-label bottom">자기관리</span><span className="radar-label bl">정보활용</span><span className="radar-label tl">문제해결</span>
+          <span className="radar-label top">협력적 소통</span><span className="radar-label tr">창의적 사고</span><span className="radar-label br">심미적 감성</span>
+          <span className="radar-label bottom">공동체</span><span className="radar-label bl">자기관리</span><span className="radar-label tl">지식정보처리</span>
         </div>
         <div className="skill-list">
           {skillRows.map(([label, value, color]) => <div className="skill-row" key={label}><span>{label}</span><div><i style={{ width: `${value}%`, background: color }} /></div><strong>{value}</strong></div>)}
         </div>
       </div>
-      <div className="growth-note"><span>↗</span><p><strong>의사소통 역량이 가장 많이 자랐어요!</strong><small>친구 인터뷰와 은행 상담 경험 덕분이에요.</small></p></div>
+      <div className="growth-note"><span>↗</span><p><strong>협력적 소통 역량이 가장 많이 자랐어요!</strong><small>친구 인터뷰와 은행 상담에서 경청하고 설명한 경험 덕분이에요.</small></p></div>
     </article>
   );
 }
@@ -198,7 +242,7 @@ function StudentHome({ applied, setApplied, donated, onDonate }: { applied: numb
       <div className="job-grid home-jobs">{jobs.slice(0, 3).map((job) => <JobCard key={job.id} job={job} applied={applied.includes(job.id)} onApply={() => setApplied(job.id)} />)}</div>
       <div className="dashboard-grid"><RadarCard /><article className="panel savings-card"><div className="panel-title"><div><span className="eyebrow">저축 목표</span><h2>다음 마이룸 아이템</h2></div><span className="tiny-badge">독서형</span></div><div className="unlock-art"><div className="bookshelf"><span /><span /><span /><span /></div><div className="locked">🔒</div></div><h3>포근한 원목 책장</h3><p>저축 3,000꿈을 유지하면 해금돼요.</p><div className="fund-row"><span>2,300꿈 모음</span><strong>77%</strong></div><div className="progress purple"><i style={{ width: "77%" }} /></div><small className="remaining">700꿈만 더 모으면 만날 수 있어요!</small><button className="secondary-button">저축하러 가기</button></article></div>
       <CommunityCard donated={donated} onDonate={onDonate} />
-      <section className="panel recent-panel"><div className="panel-title"><div><span className="eyebrow">나의 발자국</span><h2>최근에 이런 일을 했어요</h2></div><button>전체 기록 보기 →</button></div><div className="timeline"><div><span className="timeline-icon violet">✎</span><p><strong>친구 인터뷰 완료</strong><small>기자 업무 · 재미있음 5 · 의사소통 +3</small></p><b>어제</b></div><div><span className="timeline-icon green">₩</span><p><strong>저축 상담 2건 확인</strong><small>기본직업 은행원 · 자기관리 +1</small></p><b>3일 전</b></div><div><span className="timeline-icon orange">✦</span><p><strong>행사 이름표 디자인</strong><small>디자인 업무 · 창의성 +3</small></p><b>지난주</b></div></div></section>
+      <section className="panel recent-panel"><div className="panel-title"><div><span className="eyebrow">나의 발자국</span><h2>최근에 이런 일을 했어요</h2></div><button>전체 기록 보기 →</button></div><div className="timeline"><div><span className="timeline-icon violet">✎</span><p><strong>친구 인터뷰 완료</strong><small>기자 업무 · 재미있음 5 · 협력적 소통 +3 · 공동체 +1</small></p><b>어제</b></div><div><span className="timeline-icon green">₩</span><p><strong>저축 상담 2건 확인</strong><small>기본직업 은행원 · 자기관리 +1 · 협력적 소통 +1</small></p><b>3일 전</b></div><div><span className="timeline-icon orange">✦</span><p><strong>행사 이름표 디자인</strong><small>디자인 업무 · 심미적 감성 +3 · 창의적 사고 +2</small></p><b>지난주</b></div></div></section>
     </>
   );
 }
@@ -206,7 +250,7 @@ function StudentHome({ applied, setApplied, donated, onDonate }: { applied: numb
 function JobsView({ applied, setApplied }: { applied: number[]; setApplied: (id: number) => void }) {
   const [filter, setFilter] = useState("전체");
   const filters = ["전체", "사람을 돕는 일", "만들고 해결하는 일", "정보와 돈", "알리고 표현하는 일"];
-  return <><section className="page-heading"><span className="eyebrow">일자리 탐험</span><h1>이번 주, 어떤 일을 해볼까요?</h1><p>잘해야 하는 일이 아니라 궁금한 일을 골라보세요. 경험은 모두 나의 자산이 돼요.</p></section><div className="filter-row">{filters.map((item) => <button key={item} onClick={() => setFilter(item)} className={filter === item ? "active" : ""}>{item}</button>)}</div><div className="jobs-summary"><strong>열린 공고 4개</strong><span>내가 지원한 공고 {applied.length}개</span><span>이번 주 남은 자리 7명</span></div><div className="job-grid all-jobs">{jobs.map((job) => <JobCard key={job.id} job={job} applied={applied.includes(job.id)} onApply={() => setApplied(job.id)} />)}</div></>;
+  return <><section className="page-heading"><span className="eyebrow">일자리 탐험</span><h1>이번 주, 어떤 일을 해볼까요?</h1><p>잘해야 하는 일이 아니라 궁금한 일을 골라보세요. 공고의 성장값은 활동에서 실제로 사용하는 2022 개정 교육과정 핵심역량을 기준으로 정했어요.</p></section><div className="filter-row">{filters.map((item) => <button key={item} onClick={() => setFilter(item)} className={filter === item ? "active" : ""}>{item}</button>)}</div><div className="jobs-summary"><strong>열린 공고 4개</strong><span>내가 지원한 공고 {applied.length}개</span><span>이번 주 남은 자리 7명</span></div><div className="job-grid all-jobs">{jobs.map((job) => <JobCard key={job.id} job={job} applied={applied.includes(job.id)} onApply={() => setApplied(job.id)} />)}</div></>;
 }
 
 function WalletView({ donated, onDonate }: { donated: boolean; onDonate: () => void }) {
@@ -218,7 +262,7 @@ function WalletView({ donated, onDonate }: { donated: boolean; onDonate: () => v
 }
 
 function GrowthView() {
-  return <><section className="page-heading"><span className="eyebrow">진로 성장</span><h1>직업 이름보다, 내가 해본 일을 모아요</h1><p>좋아했던 일과 자주 사용한 역량이 쌓이면 나만의 진로 지도가 완성돼요.</p></section><div className="growth-layout"><RadarCard /><article className="panel experience-card"><span className="eyebrow">나의 경험 지도</span><h2>이번 학기 13번의 경험</h2><div className="experience-orbits"><div className="orbit-center"><Avatar small /></div><span className="orbit one">금융 <b>7</b></span><span className="orbit two">소통 <b>3</b></span><span className="orbit three">디자인 <b>2</b></span><span className="orbit four">기획 <b>1</b></span></div><div className="badge-row"><span>🏦<small>금융 경험</small></span><span>🎙️<small>소통 발견</small></span><span>🧭<small>탐험가</small></span><span className="locked-badge">🔒<small>다음 배지</small></span></div></article></div><article className="panel reflection-card"><div><span className="eyebrow">나의 발견 노트</span><h2>나는 이런 순간이 좋았어요</h2></div><blockquote>“친구에게 복잡한 내용을 쉽게 설명해서 이해했을 때 뿌듯했어요.”</blockquote><div><strong>좋아한 활동</strong><span>친구 인터뷰</span><span>저축 상담</span><span>자료 정리</span></div></article></>;
+  return <><section className="page-heading"><span className="eyebrow">진로 성장</span><h1>직업 이름보다, 내가 해본 일을 모아요</h1><p>좋아했던 일과 자주 사용한 핵심역량이 쌓이면 나만의 진로 지도가 완성돼요.</p></section><div className="growth-layout"><RadarCard /><article className="panel experience-card"><span className="eyebrow">나의 경험 지도</span><h2>이번 학기 13번의 경험</h2><div className="experience-orbits"><div className="orbit-center"><Avatar small /></div><span className="orbit one">금융 <b>7</b></span><span className="orbit two">소통 <b>3</b></span><span className="orbit three">디자인 <b>2</b></span><span className="orbit four">기획 <b>1</b></span></div><div className="badge-row"><span>🏦<small>금융 경험</small></span><span>🎙️<small>소통 발견</small></span><span>🧭<small>탐험가</small></span><span className="locked-badge">🔒<small>다음 배지</small></span></div></article></div><article className="panel reflection-card"><div><span className="eyebrow">나의 발견 노트</span><h2>나는 이런 순간이 좋았어요</h2></div><blockquote>“친구의 이야기를 잘 듣고 복잡한 내용을 쉽게 설명했을 때 뿌듯했어요.”</blockquote><div><strong>좋아한 활동</strong><span>친구 인터뷰</span><span>저축 상담</span><span>자료 정리</span></div></article><section className="competency-section"><div className="competency-heading"><div><span className="eyebrow">2022 개정 교육과정 핵심역량</span><h2>여섯 가지 힘을 골고루 발견해요</h2><p>점수는 서로 비교하는 순위가 아니라, 공고를 수행하며 어떤 힘을 사용했는지 보여주는 성장 기록이에요.</p></div><span>교육과정 기반</span></div><div className="competency-grid">{competencyDefinitions.map((item) => <article className="competency-card" key={item.name}><span className="competency-icon" style={{ color: item.color, background: `${item.color}18` }}>{item.icon}</span><div><h3>{item.name}</h3><p>{item.description}</p></div></article>)}</div></section></>;
 }
 
 function RoomView() {

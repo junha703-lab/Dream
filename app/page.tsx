@@ -245,15 +245,15 @@ function Sidebar({ active, onChange, student, onLogout }: { active: StudentView;
       <nav aria-label="학생 메뉴" className="side-nav">
         {visibleItems.map((item) => {
           const locked = Boolean(viewFeature[item.id] && !student.feature_unlocks.includes(viewFeature[item.id]!));
-          return <button key={item.id} className={`${active === item.id ? "active" : ""} ${locked ? "nav-locked" : ""}`} onClick={() => onChange(item.id)}>
-            <span>{locked ? "◌" : item.icon}</span><span className="nav-copy">{item.label}{locked && <small>{featureCopy[viewFeature[item.id]!]?.condition}</small>}</span>
+          return <button key={item.id} title={locked ? featureCopy[viewFeature[item.id]!]?.condition : undefined} className={`${active === item.id ? "active" : ""} ${locked ? "nav-locked" : ""}`} onClick={() => onChange(item.id)}>
+            <span>{locked ? "◌" : item.icon}</span><span className="nav-copy">{item.label}{locked && <small>아직 잠겨 있어요</small>}</span>
           </button>
         })}
       </nav>
       <div className="side-tip">
         <span>💡</span>
-        <strong>이번 주 작은 질문</strong>
-        <p>어떤 일을 할 때 시간이 빨리 갔나요?</p>
+        <strong>이번 주 생각</strong>
+        <p>시간이 빨리 간 일은?</p>
       </div>
       <div className="side-profile"><Avatar small /><span><strong>{student.display_name}</strong><small>{student.basic_job ?? "직업 대기"} · {stageNames[student.growth_stage - 1]}</small></span><button aria-label="로그아웃" title="로그아웃" onClick={onLogout}>↪</button></div>
     </aside>
@@ -289,7 +289,7 @@ function JobCard({ job, applied, onApply }: { job: (typeof jobs)[number]; applie
       <h3>{job.title}</h3>
       <p>{job.description}</p>
       <div className="job-meta"><span>♙ {job.people}</span><span>◷ {job.time}</span><strong>+{job.pay.toLocaleString()} 꿈</strong></div>
-      <div className="skill-tags">{job.skills.map((skill) => <span key={skill}>{skill}</span>)}</div>
+      <div className="skill-tags" aria-label="성장 역량">{job.skills.map((skill) => <span key={skill}>{skill}</span>)}</div>
       <button className={applied ? "apply-button applied" : "apply-button"} onClick={onApply}>{applied ? "지원 완료 ✓" : "이 일 경험해 보기"}</button>
     </article>
   );
@@ -342,17 +342,17 @@ function StarterHome({ student, onCompleteTask, busy }: { student: StudentData; 
 function StudentHome({ student, applied, setApplied, donated, onDonate }: { student: StudentData; applied: number[]; setApplied: (id: number) => void; donated: boolean; onDonate: () => void }) {
   return (
     <>
-      <section className="welcome-row"><div><span className="eyebrow">{stageNames[student.growth_stage - 1]} · 좋은 아침이에요</span><h1>{student.display_name}님의 오늘도 <em>멋진 탐험</em>이 기다려요!</h1><p>이번 주에는 새로운 일을 하나 경험해 볼까요?</p></div><div className="weather-note"><span>☀</span><p><strong>맑음 · 27°</strong><small>새로운 도전에 좋은 날!</small></p></div></section>
+      <section className="welcome-row"><div><span className="eyebrow">{stageNames[student.growth_stage - 1]}</span><h1>{student.display_name}님, 오늘은 <em>어떤 일</em>을 해볼까요?</h1><p>이번 주에 궁금한 일 하나를 골라보세요.</p></div></section>
       <section className="profile-hero">
         <div className="profile-art"><div className="spark spark-a">✦</div><div className="spark spark-b">✦</div><Avatar /></div>
-        <div className="profile-copy"><span className="job-chip">나의 기본직업</span><h2>우리 반의 <em>{student.basic_job ?? "새로운 역할"}</em></h2><p>맡은 역할을 꾸준히 경험하며 나에게 맞는 일과 강점을 발견해요.</p><div className="role-tasks"><span>✓ 기본 업무 확인</span><span>✓ 친구와 협력</span><span>✓ 경험 기록</span></div><button className="text-button">나의 직업 자세히 보기 →</button></div>
+        <div className="profile-copy"><span className="job-chip">나의 기본직업</span><h2>우리 반의 <em>{student.basic_job ?? "새로운 역할"}</em></h2><p>맡은 일을 하며 나의 강점을 발견해요.</p><div className="role-tasks"><span>✓ 기본 업무</span><span>✓ 친구와 협력</span><span>✓ 경험 기록</span></div><button className="text-button">직업 자세히 보기 →</button></div>
         <div className="week-mission"><span>기본직업 업무 경험</span><strong>{student.basic_job_tasks_completed}번의 일을 해봤어요</strong><div className="mission-progress"><i style={{ width: `${Math.min(100, student.basic_job_tasks_completed / 4 * 100)}%` }} /></div><small>경험할수록 새로운 항로가 열려요.</small></div>
       </section>
-      <section className="money-grid"><MoneyCard label="현재 현금" value={`${student.cash.toLocaleString()} 꿈`} detail="내가 일해서 번 돈" icon="₩" tone="purple" />{student.feature_unlocks.includes("bank") && <MoneyCard label="차곡차곡 저축" value={`${student.savings.toLocaleString()} 꿈`} detail={`마이룸까지 ${Math.max(0, 3000 - student.savings).toLocaleString()}`} icon="▥" tone="green" />}{student.feature_unlocks.includes("housing") && <MoneyCard label="나의 자리" value={student.housing_name ?? "자리 배정 대기"} detail="집과 생활 항로" icon="⌑" tone="orange" />}</section>
-      {student.feature_unlocks.includes("job_board") && <><section className="section-head"><div><span className="eyebrow">이번 주 일자리</span><h2>새로운 일을 탐험해 봐요</h2><p>기본직업과 달라도 괜찮아요. 마음이 가는 일을 골라보세요.</p></div><button>공고 전체 보기 →</button></section><div className="job-grid home-jobs">{jobs.slice(0, 3).map((job) => <JobCard key={job.id} job={job} applied={applied.includes(job.id)} onApply={() => setApplied(job.id)} />)}</div></>}
+      <section className="money-grid"><MoneyCard label="현금" value={`${student.cash.toLocaleString()} 꿈`} detail="사용 가능한 돈" icon="₩" tone="purple" />{student.feature_unlocks.includes("bank") && <MoneyCard label="저축" value={`${student.savings.toLocaleString()} 꿈`} detail={`마이룸까지 ${Math.max(0, 3000 - student.savings).toLocaleString()}꿈`} icon="▥" tone="green" />}{student.feature_unlocks.includes("housing") && <MoneyCard label="나의 자리" value={student.housing_name ?? "배정 대기"} detail="현재 생활 공간" icon="⌑" tone="orange" />}</section>
+      {student.feature_unlocks.includes("job_board") && <><section className="section-head"><div><span className="eyebrow">이번 주 일자리</span><h2>궁금한 일을 골라보세요</h2><p>기본직업과 달라도 괜찮아요.</p></div><button>공고 전체 보기 →</button></section><div className="job-grid home-jobs">{jobs.slice(0, 3).map((job) => <JobCard key={job.id} job={job} applied={applied.includes(job.id)} onApply={() => setApplied(job.id)} />)}</div></>}
       <div className={`dashboard-grid ${student.feature_unlocks.includes("competencies") ? "" : "single-card"}`}>{student.feature_unlocks.includes("competencies") && <RadarCard />}<article className="panel savings-card"><div className="panel-title"><div><span className="eyebrow">저축 목표</span><h2>다음 마이룸 아이템</h2></div><span className="tiny-badge">독서형</span></div><div className="unlock-art"><div className="bookshelf"><span /><span /><span /><span /></div><div className="locked">🔒</div></div><h3>포근한 원목 책장</h3><p>저축 3,000꿈을 유지하면 해금돼요.</p><div className="fund-row"><span>{student.savings.toLocaleString()}꿈 모음</span><strong>{Math.min(100, Math.round(student.savings / 3000 * 100))}%</strong></div><div className="progress purple"><i style={{ width: `${Math.min(100, student.savings / 3000 * 100)}%` }} /></div><small className="remaining">{Math.max(0, 3000 - student.savings).toLocaleString()}꿈만 더 모으면 만날 수 있어요!</small><button className="secondary-button">저축하러 가기</button></article></div>
       {student.feature_unlocks.includes("community_fund") && <CommunityCard donated={donated} onDonate={onDonate} />}
-      <section className="panel recent-panel"><div className="panel-title"><div><span className="eyebrow">나의 발자국</span><h2>최근에 이런 일을 했어요</h2></div><button>전체 기록 보기 →</button></div><div className="timeline"><div><span className="timeline-icon violet">✎</span><p><strong>친구 인터뷰 완료</strong><small>기자 업무 · 재미있음 5 · 협력적 소통 +3 · 공동체 +1</small></p><b>어제</b></div><div><span className="timeline-icon green">₩</span><p><strong>저축 상담 2건 확인</strong><small>기본직업 은행원 · 자기관리 +1 · 협력적 소통 +1</small></p><b>3일 전</b></div><div><span className="timeline-icon orange">✦</span><p><strong>행사 이름표 디자인</strong><small>디자인 업무 · 심미적 감성 +3 · 창의적 사고 +2</small></p><b>지난주</b></div></div></section>
+      <section className="panel recent-panel"><div className="panel-title"><div><span className="eyebrow">나의 발자국</span><h2>최근 경험</h2></div><button>전체 보기 →</button></div><div className="timeline"><div><span className="timeline-icon violet">✎</span><p><strong>친구 인터뷰</strong><small>협력적 소통 +3 · 공동체 +1</small></p><b>어제</b></div><div><span className="timeline-icon green">₩</span><p><strong>저축 상담 2건</strong><small>자기관리 +1 · 협력적 소통 +1</small></p><b>3일 전</b></div><div><span className="timeline-icon orange">✦</span><p><strong>행사 이름표 디자인</strong><small>심미적 감성 +3 · 창의적 사고 +2</small></p><b>지난주</b></div></div></section>
     </>
   );
 }
@@ -360,7 +360,7 @@ function StudentHome({ student, applied, setApplied, donated, onDonate }: { stud
 function JobsView({ applied, setApplied }: { applied: number[]; setApplied: (id: number) => void }) {
   const [filter, setFilter] = useState("전체");
   const filters = ["전체", "사람을 돕는 일", "만들고 해결하는 일", "정보와 돈", "알리고 표현하는 일"];
-  return <><section className="page-heading"><span className="eyebrow">일자리 탐험</span><h1>이번 주, 어떤 일을 해볼까요?</h1><p>잘해야 하는 일이 아니라 궁금한 일을 골라보세요. 공고의 성장값은 활동에서 실제로 사용하는 2022 개정 교육과정 핵심역량을 기준으로 정했어요.</p></section><div className="filter-row">{filters.map((item) => <button key={item} onClick={() => setFilter(item)} className={filter === item ? "active" : ""}>{item}</button>)}</div><div className="jobs-summary"><strong>열린 공고 4개</strong><span>내가 지원한 공고 {applied.length}개</span><span>이번 주 남은 자리 7명</span></div><div className="job-grid all-jobs">{jobs.map((job) => <JobCard key={job.id} job={job} applied={applied.includes(job.id)} onApply={() => setApplied(job.id)} />)}</div></>;
+  return <><section className="page-heading"><span className="eyebrow">일자리 탐험</span><h1>어떤 일을 해볼까요?</h1><p>궁금한 일을 고르세요. 완료하면 표시된 핵심역량이 자라요.</p></section><div className="filter-row">{filters.map((item) => <button key={item} onClick={() => setFilter(item)} className={filter === item ? "active" : ""}>{item}</button>)}</div><div className="jobs-summary"><strong>공고 4개</strong><span>지원 {applied.length}개</span><span>남은 자리 7명</span></div><div className="job-grid all-jobs">{jobs.map((job) => <JobCard key={job.id} job={job} applied={applied.includes(job.id)} onApply={() => setApplied(job.id)} />)}</div></>;
 }
 
 function WalletView({ student, donated, onDonate, onSave, busy }: { student: StudentData; donated: boolean; onDonate: () => void; onSave: () => void; busy: boolean }) {

@@ -13,6 +13,10 @@ type Badge = { key: string; name: string; description: string; icon: string; awa
 type RoomItem = { key: string; name: string; slot: string; style: string; required: number; visual: string; unlocked: boolean; equipped: boolean };
 type Seat = { id: string; code: string; name: string; type: string; rent: number; move_cost: number; available: boolean };
 type CommunityGoal = { id?: string; title?: string; description?: string; target_amount?: number; current_amount?: number; min_donations?: number; qualified_students?: number; total_students?: number; status?: string };
+type BasicJobTask = { id: string; key: string; title: string; description: string; proof_mode: "system" | "photo" | "result" | "peer" | "checklist" };
+type BasicJobSubmission = { id: string; task_id: string; title: string; proof_mode: BasicJobTask["proof_mode"]; summary: string; evidence_url?: string; status: "pending_confirmation" | "confirmed" | "rejected"; submitted_at: string; reviewed_at?: string; verifier_name?: string };
+type PeerReview = { id: string; student_name: string; task_title: string; summary: string; submitted_at: string };
+type Classmate = { id: string; name: string; job?: string };
 type StudentData = {
   student_id: string; display_name: string; student_number: number; first_login: boolean; account_status: string;
   basic_job: string | null; job_world?: string | null; cash: number; savings: number; housing_name: string | null;
@@ -23,6 +27,8 @@ type StudentData = {
   career_experiences: { job: string; count: number; kind: string }[];
   avatar: { hair: string; background: string; displayed_badge_key: string | null };
   room_items: RoomItem[]; seats: Seat[]; community_goal: CommunityGoal;
+  basic_job_task_catalog: BasicJobTask[]; basic_job_submissions: BasicJobSubmission[];
+  peer_review_queue: PeerReview[]; classmates: Classmate[];
 };
 type TeacherData = {
   teacher_id: string; display_name: string; class_code: string; class_name: string; grade?: number; section?: number;
@@ -89,9 +95,52 @@ function Sidebar({ student, active, onChange, onLogout }: { student: StudentData
 
 function Topbar({ label, onLogout }: { label: string; onLogout?: () => void }) { return <header className="topbar"><div className="mobile-brand"><Brand /></div><div className="week-pill"><span /> {label}</div><div className="top-actions">{onLogout ? <button className="role-switch" onClick={onLogout}>로그아웃</button> : null}</div></header>; }
 
+const proofInfo: Record<BasicJobTask["proof_mode"], { icon: string; label: string; help: string }> = {
+  system: { icon: "⚙", label: "자동 기록", help: "앱 안에서 처리하면 자동으로 남아요." },
+  photo: { icon: "▣", label: "사진", help: "활동 또는 결과가 보이는 사진을 남겨요." },
+  result: { icon: "↗", label: "결과물", help: "사진이나 결과물 링크를 남겨요." },
+  peer: { icon: "♡", label: "친구 확인", help: "함께한 친구가 활동을 확인해요." },
+  checklist: { icon: "✓", label: "체크 기록", help: "확인한 항목과 결과를 한 문장으로 남겨요." },
+};
+
+function BasicJobWorkPanel({ student, busy, act }: { student: StudentData; busy: boolean; act: (action: string, extra?: Record<string, unknown>) => Promise<void> }) {
+  const tasks = student.basic_job_task_catalog ?? [];
+  const submissions = student.basic_job_submissions ?? [];
+  const peerQueue = student.peer_review_queue ?? [];
+  const classmates = student.classmates ?? [];
+  const [selectedId, setSelectedId] = useState("");
+  const [summary, setSummary] = useState("");
+  const [evidenceUrl, setEvidenceUrl] = useState("");
+  const [photoName, setPhotoName] = useState("");
+  const [verifierId, setVerifierId] = useState("");
+  const [checked, setChecked] = useState(false);
+  const selected = tasks.find((task) => task.id === selectedId);
+
+  const choose = (task: BasicJobTask) => {
+    setSelectedId(task.id); setSummary(""); setEvidenceUrl(""); setPhotoName(""); setVerifierId(""); setChecked(false);
+    window.setTimeout(() => document.getElementById("basic-job-form")?.scrollIntoView({ behavior: "smooth", block: "center" }), 20);
+  };
+  const addPhoto = (file?: File) => {
+    if (!file) return;
+    if (file.size > 750_000) { window.alert("사진은 750KB보다 작게 줄여 주세요."); return; }
+    const reader = new FileReader();
+    reader.onload = () => { setEvidenceUrl(String(reader.result ?? "")); setPhotoName(file.name); };
+    reader.readAsDataURL(file);
+  };
+  const submit = async () => {
+    if (!selected) return;
+    await act("submit-basic-task", { taskId: selected.id, summary, evidenceUrl, verifierStudentId: verifierId || null });
+    setSelectedId(""); setSummary(""); setEvidenceUrl(""); setPhotoName(""); setVerifierId(""); setChecked(false);
+  };
+  const needsEvidence = selected?.proof_mode === "photo" || selected?.proof_mode === "result";
+  const ready = Boolean(selected && summary.trim().length >= 5 && (!needsEvidence || evidenceUrl) && (selected.proof_mode !== "peer" || verifierId) && (selected.proof_mode !== "checklist" || checked));
+
+  return <section className="basic-work" id="basic-job-work"><div className="section-head"><div><span className="eyebrow">나의 기본직업</span><h2>한 일을 증거와 함께 남겨요</h2><p>직업에 맞는 방식으로 기록하면 기본직업 경험에 반영됩니다.</p></div><span className="basic-work-count">이번 학기 {student.basic_job_tasks_completed}회</span></div><div className="basic-task-grid">{tasks.map((task) => { const proof = proofInfo[task.proof_mode]; const latest = submissions.find((item) => item.task_id === task.id); return <article key={task.id} className={`basic-task-card ${selectedId === task.id ? "active" : ""}`}><div className="basic-task-head"><span>{proof.icon}</span><b>{proof.label}</b></div><h3>{task.title}</h3><p>{task.description}</p><small>{proof.help}</small>{latest ? <span className={`proof-status ${latest.status}`}>{latest.status === "confirmed" ? "기록 완료" : latest.status === "pending_confirmation" ? "친구 확인 중" : "다시 기록하기"}</span> : null}<button disabled={busy || task.proof_mode === "system"} onClick={() => choose(task)}>{task.proof_mode === "system" ? "업무 처리 시 자동 기록" : "활동 기록하기"}</button></article>; })}</div>{selected ? <article className="panel basic-proof-form" id="basic-job-form"><div className="panel-title"><div><span className="eyebrow">{proofInfo[selected.proof_mode].label}</span><h2>{selected.title}</h2></div><button type="button" onClick={() => setSelectedId("")} aria-label="기록 닫기">×</button></div><label>무엇을 했나요?<textarea value={summary} onChange={(e) => setSummary(e.target.value)} placeholder="내가 실제로 한 일을 한 문장으로 적어요." /></label>{needsEvidence ? <><label className="photo-field">사진 선택<input type="file" accept="image/jpeg,image/png,image/webp" onChange={(e) => addPhoto(e.target.files?.[0])} /><span>{photoName || "사진 선택 (750KB 이하)"}</span></label><input aria-label="결과물 링크" value={evidenceUrl.startsWith("data:") ? "" : evidenceUrl} onChange={(e) => { setEvidenceUrl(e.target.value); setPhotoName(""); }} placeholder="또는 결과물 링크를 붙여 넣어요" /></> : null}{selected.proof_mode === "peer" ? <label>확인해 줄 친구<select value={verifierId} onChange={(e) => setVerifierId(e.target.value)}><option value="">친구 선택</option>{classmates.map((mate) => <option key={mate.id} value={mate.id}>{mate.name} · {mate.job ?? "친구"}</option>)}</select></label> : null}{selected.proof_mode === "checklist" ? <label className="check-proof"><input type="checkbox" checked={checked} onChange={(e) => setChecked(e.target.checked)} />점검 항목을 실제로 확인했고 결과를 기록했어요.</label> : null}<button className="apply-button" disabled={busy || !ready} onClick={submit}>{busy ? "기록 중…" : selected.proof_mode === "peer" ? "친구에게 확인 요청" : "증거와 함께 기록"}</button></article> : null}{peerQueue.length ? <article className="panel peer-proof-panel"><div className="panel-title"><div><span className="eyebrow">친구 확인 요청</span><h2>내가 함께한 일이 맞나요?</h2></div><span className="count-badge">{peerQueue.length}</span></div>{peerQueue.map((item) => <div className="peer-proof-row" key={item.id}><p><strong>{item.student_name} · {item.task_title}</strong><small>{item.summary}</small></p><button disabled={busy} onClick={() => act("review-basic-task", { submissionId: item.id, decision: "confirm" })}>맞아요</button><button className="subtle" disabled={busy} onClick={() => act("review-basic-task", { submissionId: item.id, decision: "reject" })}>보완 요청</button></div>)}</article> : null}{submissions.length ? <div className="basic-history"><strong>최근 기본업무 기록</strong>{submissions.slice(0, 4).map((item) => <span key={item.id}>{item.title}<b className={item.status}>{item.status === "confirmed" ? "완료" : item.status === "pending_confirmation" ? `${item.verifier_name ?? "친구"} 확인 중` : "보완 필요"}</b></span>)}</div> : null}</section>;
+}
+
 function HomeView({ student, busy, act }: { student: StudentData; busy: boolean; act: (action: string, extra?: Record<string, unknown>) => Promise<void> }) {
   const goal = student.community_goal ?? {};
-  return <><section className="welcome-row"><div><span className="eyebrow">오늘의 진로생활</span><h1>{student.display_name}님, 오늘은 어떤 일을<br /><em>경험해 볼까요?</em></h1><p>친구와 함께 실제 교실의 일을 해보며 나의 강점을 발견해요.</p></div></section><section className="profile-hero"><div className="profile-art"><Avatar job={student.basic_job} /></div><div className="profile-copy"><span className="job-chip">나의 기본직업</span><h2>{student.basic_job ?? "직업 배정 대기"}</h2><p>{student.job_world ?? "교실에서 맡은 역할을 하나씩 경험해요."}</p><div className="role-tasks"><span>기본업무 {student.basic_job_tasks_completed}회</span><span>공고 완료 {student.jobs_completed}회</span></div></div><div className="week-mission"><span>기본직업 기록</span><strong>실제 교실 업무를 마쳤나요?</strong><small>완료할 때마다 새로운 기능이 열립니다.</small><button className="apply-button" disabled={busy} onClick={() => act("complete-task")}>{busy ? "기록 중…" : "기본업무 완료 기록"}</button></div></section><section className="money-grid"><article className="money-card"><span className="round-icon purple">₩</span><div><p>사용 가능한 현금</p><strong>{student.cash.toLocaleString()}꿈</strong><small>거래는 모두 안전하게 기록돼요.</small></div></article><article className="money-card"><span className="round-icon green">▥</span><div><p>차곡차곡 저축</p><strong>{student.savings.toLocaleString()}꿈</strong><small>3,000꿈부터 마이룸이 열려요.</small></div></article><article className="money-card"><span className="round-icon orange">⌂</span><div><p>현재 자리</p><strong>{student.housing_name ?? "배정 대기"}</strong><small>자리마다 특징과 주거비가 달라요.</small></div></article></section>{student.postings.length ? <><section className="section-head"><div><span className="eyebrow">이번 주 일자리</span><h2>궁금한 일을 골라보세요</h2></div></section><div className="job-grid home-jobs">{student.postings.slice(0, 3).map((posting) => <CompactPosting key={posting.id} posting={posting} application={student.applications.find((a) => a.posting_id === posting.id)} busy={busy} act={act} />)}</div></> : <article className="panel empty-state"><strong>이번 주 공고를 준비하고 있어요.</strong><p>선생님이 이번 주를 시작하면 새로운 일이 열립니다.</p></article>}{goal.id ? <Community goal={goal} cash={student.cash} busy={busy} act={act} /> : null}</>;
+  return <><section className="welcome-row"><div><span className="eyebrow">오늘의 진로생활</span><h1>{student.display_name}님, 오늘은 어떤 일을<br /><em>경험해 볼까요?</em></h1><p>친구와 함께 실제 교실의 일을 해보며 나의 강점을 발견해요.</p></div></section><section className="profile-hero"><div className="profile-art"><Avatar job={student.basic_job} /></div><div className="profile-copy"><span className="job-chip">나의 기본직업</span><h2>{student.basic_job ?? "직업 배정 대기"}</h2><p>{student.job_world ?? "교실에서 맡은 역할을 하나씩 경험해요."}</p><div className="role-tasks"><span>기본업무 {student.basic_job_tasks_completed}회</span><span>공고 완료 {student.jobs_completed}회</span></div></div><div className="week-mission"><span>기본직업 기록</span><strong>한 일을 어떻게 증명할까요?</strong><small>직업에 맞게 사진·결과물·친구 확인으로 남겨요.</small><button className="apply-button" onClick={() => document.getElementById("basic-job-work")?.scrollIntoView({ behavior: "smooth" })}>나의 기본업무 보기</button></div></section><section className="money-grid"><article className="money-card"><span className="round-icon purple">₩</span><div><p>사용 가능한 현금</p><strong>{student.cash.toLocaleString()}꿈</strong><small>거래는 모두 안전하게 기록돼요.</small></div></article><article className="money-card"><span className="round-icon green">▥</span><div><p>차곡차곡 저축</p><strong>{student.savings.toLocaleString()}꿈</strong><small>3,000꿈부터 마이룸이 열려요.</small></div></article><article className="money-card"><span className="round-icon orange">⌂</span><div><p>현재 자리</p><strong>{student.housing_name ?? "배정 대기"}</strong><small>자리마다 특징과 주거비가 달라요.</small></div></article></section><BasicJobWorkPanel student={student} busy={busy} act={act} />{student.postings.length ? <><section className="section-head"><div><span className="eyebrow">이번 주 일자리</span><h2>궁금한 일을 골라보세요</h2></div></section><div className="job-grid home-jobs">{student.postings.slice(0, 3).map((posting) => <CompactPosting key={posting.id} posting={posting} application={student.applications.find((a) => a.posting_id === posting.id)} busy={busy} act={act} />)}</div></> : <article className="panel empty-state"><strong>이번 주 공고를 준비하고 있어요.</strong><p>선생님이 이번 주를 시작하면 새로운 일이 열립니다.</p></article>}{goal.id ? <Community goal={goal} cash={student.cash} busy={busy} act={act} /> : null}</>;
 }
 
 function skillsText(rewards: Record<string, number>) { return Object.entries(rewards).map(([key, value]) => `${competencyNames[key] ?? key} +${value}`); }

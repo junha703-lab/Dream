@@ -58,6 +58,24 @@ export async function POST(request: Request) {
       const result = await callSupabaseRpc<RpcResult>("fo_complete_basic_task", { p_session_token: token });
       return json(result, result.ok ? 200 : 400);
     }
+    if (action === "submit-basic-task") {
+      const result = await callSupabaseRpc<RpcResult>("fo_student_submit_basic_task", {
+        p_session_token: token,
+        p_task_id: String(body.taskId ?? ""),
+        p_summary: String(body.summary ?? ""),
+        p_evidence_url: String(body.evidenceUrl ?? ""),
+        p_verifier_student_id: body.verifierStudentId ? String(body.verifierStudentId) : null,
+      });
+      return json(result, result.ok ? 200 : 400);
+    }
+    if (action === "review-basic-task") {
+      const result = await callSupabaseRpc<RpcResult>("fo_student_review_basic_task", {
+        p_session_token: token,
+        p_submission_id: String(body.submissionId ?? ""),
+        p_decision: String(body.decision ?? ""),
+      });
+      return json(result, result.ok ? 200 : 400);
+    }
     if (action === "save") {
       const result = await callSupabaseRpc<RpcResult>("fo_student_save", { p_session_token: token, p_amount: Number(body.amount ?? 0) });
       return json(result, result.ok ? 200 : 400);

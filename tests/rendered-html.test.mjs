@@ -76,3 +76,22 @@ test("keeps Supabase sessions server-side and deployment targets explicit", asyn
   const hostingConfig = JSON.parse(hosting);
   assert.ok(hostingConfig.project_id);
 });
+
+test("records basic-job work with evidence instead of a self-reported completion click", async () => {
+  const [page, studentApi, migration] = await Promise.all([
+    readFile(new URL("app/page.tsx", root), "utf8"),
+    readFile(new URL("app/api/student/route.ts", root), "utf8"),
+    readFile(new URL("supabase/migrations/20260810094605_add_basic_job_evidence_workflow.sql", root), "utf8"),
+  ]);
+
+  assert.doesNotMatch(page, /기본업무 완료 기록/);
+  for (const label of ["자동 기록", "사진", "결과물", "친구 확인", "체크 기록"]) {
+    assert.match(page, new RegExp(label));
+  }
+  assert.match(page, /친구에게 확인 요청/);
+  assert.match(studentApi, /fo_student_submit_basic_task/);
+  assert.match(studentApi, /fo_student_review_basic_task/);
+  assert.match(migration, /basic_job_submissions_no_direct_access/);
+  assert.match(migration, /bank_review:/);
+  assert.match(migration, /credit_basic_job_submission/);
+});

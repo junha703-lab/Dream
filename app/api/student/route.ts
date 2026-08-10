@@ -97,6 +97,15 @@ export async function POST(request: Request) {
       const result = await callSupabaseRpc<RpcResult>("fo_student_request_seat", { p_session_token: token, p_seat_id: String(body.seatId ?? "") });
       return json(result, result.ok ? 200 : 400);
     }
+    if (action === "update-avatar") {
+      const result = await callSupabaseRpc<RpcResult>("fo_student_update_avatar", {
+        p_session_token: token,
+        p_hair: String(body.hair ?? ""),
+        p_background: String(body.background ?? ""),
+        p_badge_key: body.badgeKey ? String(body.badgeKey) : null,
+      });
+      return json(result, result.ok ? 200 : 400);
+    }
     if (action === "logout") {
       await callSupabaseRpc<RpcResult>("fo_student_logout", { p_session_token: token });
       return json({ ok: true }, 200, clearSessionCookie(request));

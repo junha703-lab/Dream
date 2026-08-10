@@ -43,6 +43,12 @@ export async function POST(request: Request) {
       "assign-job": ["fo_teacher_assign_job", { p_student_id: String(body.studentId ?? ""), p_job_code: String(body.jobCode ?? ""), p_salary: Number(body.salary ?? 0) }],
       "open-template": ["fo_teacher_open_template", { p_template_id: String(body.templateId ?? "") }],
       "review-seat": ["fo_teacher_review_seat", { p_request_id: String(body.requestId ?? ""), p_decision: String(body.decision ?? "") }],
+      "update-class": ["fo_teacher_update_class", { p_name: String(body.name ?? ""), p_grade: Number(body.grade ?? 0), p_section: Number(body.section ?? 0) }],
+      "update-salary": ["fo_teacher_update_salary", { p_job_code: String(body.jobCode ?? ""), p_salary: Number(body.salary ?? 0) }],
+      "update-seat": ["fo_teacher_update_seat", { p_seat_id: String(body.seatId ?? ""), p_name: String(body.name ?? ""), p_type: String(body.type ?? ""), p_rent: Number(body.rent ?? 0), p_move_cost: Number(body.moveCost ?? 0), p_active: Boolean(body.active) }],
+      "update-goal": ["fo_teacher_upsert_goal", { p_title: String(body.title ?? ""), p_description: String(body.description ?? ""), p_target: Number(body.target ?? 0), p_min_donations: Number(body.minDonations ?? 0) }],
+      "create-template": ["fo_teacher_create_template", { p_title: String(body.title ?? ""), p_description: String(body.description ?? ""), p_world_key: String(body.worldKey ?? ""), p_related_job_codes: Array.isArray(body.relatedJobCodes) ? body.relatedJobCodes.map(String) : [], p_capacity: Number(body.capacity ?? 0), p_reward: Number(body.reward ?? 0), p_duration: Number(body.duration ?? 0), p_competency_rewards: body.competencyRewards ?? {}, p_submission_method: String(body.submissionMethod ?? ""), p_repeatable: Boolean(body.repeatable) }],
+      "resolve-exception": ["fo_teacher_resolve_exception", { p_exception_id: String(body.exceptionId ?? "") }],
     };
     if (action === "logout") {
       await callSupabaseRpc<RpcResult>("fo_teacher_logout", { p_session_token: token });

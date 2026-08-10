@@ -23,7 +23,37 @@ test("keeps the student experience and 2022 competencies in the product", async 
   assert.match(page, /은행원 전용/);
   assert.match(page, /내가 보낸 신청은 다른 은행원이나 선생님이 처리합니다/);
   assert.match(page, /마이룸/);
+  assert.match(page, /결과물 사진 또는 링크/);
+  assert.match(page, /캐릭터 꾸미기/);
+  assert.match(page, /학생 기본직업 배정/);
+  assert.match(page, /공동체 목표·자리 설정/);
+  assert.match(page, /새 공고 템플릿 만들기/);
   assert.doesNotMatch(page, /학생 순위|역량 구매|직업 Lv\./);
+});
+
+test("keeps the remaining classroom workflows server-controlled", async () => {
+  const [migration, studentApi, teacherApi] = await Promise.all([
+    readFile(new URL("supabase/migrations/20260810060041_complete_remaining_classroom_system.sql", root), "utf8"),
+    readFile(new URL("app/api/student/route.ts", root), "utf8"),
+    readFile(new URL("app/api/teacher/route.ts", root), "utf8"),
+  ]);
+
+  for (const fn of [
+    "fo_student_update_avatar",
+    "fo_teacher_update_salary",
+    "fo_teacher_update_seat",
+    "fo_teacher_upsert_goal",
+    "fo_teacher_create_template",
+    "fo_teacher_resolve_exception",
+    "refresh_class_exceptions",
+    "open_followup_postings",
+  ]) assert.match(migration, new RegExp(fn));
+
+  assert.match(studentApi, /update-avatar/);
+  assert.match(teacherApi, /create-template/);
+  assert.match(teacherApi, /resolve-exception/);
+  assert.match(migration, /enable row level security/);
+  assert.match(migration, /on conflict\(source_template_id,target_template_id\)/);
 });
 
 test("keeps Supabase sessions server-side and deployment targets explicit", async () => {

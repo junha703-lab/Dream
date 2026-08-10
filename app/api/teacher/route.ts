@@ -39,6 +39,10 @@ export async function POST(request: Request) {
       "start-week": ["fo_teacher_start_week", {}],
       "settle-week": ["fo_teacher_settle_week", {}],
       "review-bank": ["fo_teacher_review_bank", { p_request_id: String(body.requestId ?? ""), p_decision: String(body.decision ?? "") }],
+      "create-student": ["fo_teacher_create_student", { p_name: String(body.name ?? ""), p_number: Number(body.number ?? 0), p_job_code: String(body.jobCode ?? ""), p_temp_pin: String(body.tempPin ?? "") }],
+      "assign-job": ["fo_teacher_assign_job", { p_student_id: String(body.studentId ?? ""), p_job_code: String(body.jobCode ?? ""), p_salary: Number(body.salary ?? 0) }],
+      "open-template": ["fo_teacher_open_template", { p_template_id: String(body.templateId ?? "") }],
+      "review-seat": ["fo_teacher_review_seat", { p_request_id: String(body.requestId ?? ""), p_decision: String(body.decision ?? "") }],
     };
     if (action === "logout") {
       await callSupabaseRpc<RpcResult>("fo_teacher_logout", { p_session_token: token });
@@ -47,7 +51,9 @@ export async function POST(request: Request) {
     const call = calls[action];
     if (!call) return json({ ok: false, message: "지원하지 않는 요청입니다." }, 400);
     const result = await callSupabaseRpc<RpcResult>(call[0], { p_session_token: token, ...call[1] });
-    return json(result, result.ok ? 200 : 400);
+    if (!result.ok) return json(result, 400);
+    const refreshed = await callSupabaseRpc<RpcResult>("fo_teacher_session", { p_session_token: token });
+    return json({ ...result, teacher: refreshed.teacher });
   } catch {
     return json({ ok: false, message: "잠시 후 다시 시도해 주세요." }, 503);
   }

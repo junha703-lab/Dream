@@ -95,3 +95,17 @@ test("records basic-job work with evidence instead of a self-reported completion
   assert.match(migration, /bank_review:/);
   assert.match(migration, /credit_basic_job_submission/);
 });
+
+test("makes an active teacher week and expired sessions explicit", async () => {
+  const [page, teacherApi] = await Promise.all([
+    readFile(new URL("app/page.tsx", root), "utf8"),
+    readFile(new URL("app/api/teacher/route.ts", root), "utf8"),
+  ]);
+
+  assert.match(page, /week-running-banner/);
+  assert.match(page, /주차는 이미 시작됐어요/);
+  assert.match(page, /다음 주는 이번 주 정산 후 시작할 수 있어요/);
+  assert.match(page, /교사 로그인이 만료됐어요/);
+  assert.match(teacherApi, /SESSION_EXPIRED/);
+  assert.match(teacherApi, /clearSessionCookie\(request, TEACHER_SESSION_COOKIE\)/);
+});

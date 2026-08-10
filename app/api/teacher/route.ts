@@ -57,7 +57,13 @@ export async function POST(request: Request) {
     const call = calls[action];
     if (!call) return json({ ok: false, message: "지원하지 않는 요청입니다." }, 400);
     const result = await callSupabaseRpc<RpcResult>(call[0], { p_session_token: token, ...call[1] });
-    if (!result.ok) return json(result, 400);
+    if (!result.ok) {
+      if (result.code === "SESSION_EXPIRED") {
+        console.warn("[api/teacher] session expired", { action });
+        return json({ ...result, message: "로그인이 만료됐어요. 다시 로그인해 주세요." }, 401, clearSessionCookie(request, TEACHER_SESSION_COOKIE));
+      }
+      return json(result, 400);
+    }
     const refreshed = await callSupabaseRpc<RpcResult>("fo_teacher_session", { p_session_token: token });
     return json({ ...result, teacher: refreshed.teacher });
   } catch {

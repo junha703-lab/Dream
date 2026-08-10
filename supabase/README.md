@@ -22,14 +22,14 @@ Both are configured in Sites production runtime. The publishable key is not a se
 
 ## Test accounts
 
-- First-login flow: class `603`, name `김민준`, temporary PIN `3841`
-- Returning-student flow: class `603`, name `김하늘`, PIN `2580`
+- First-login flow: use a teacher-issued class code, student name, and temporary PIN.
+- Returning-student flow: use the PIN changed by the student after first login.
 
 Replace these demonstration records before importing a real roster.
 
 ## Verification
 
-1. Sign in as 김민준 and set a new four-digit PIN.
+1. Sign in with a teacher-issued temporary account and set a new four-digit PIN.
 2. Complete the first basic-job task and confirm that the wallet and bank unlock together with the first salary.
 3. Save 100꿈 and confirm that housing unlocks.
 4. Sign out, sign back in, and confirm that progress is restored from Supabase.

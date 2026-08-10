@@ -169,7 +169,7 @@ function Brand() {
 }
 
 function LoginVoyage({ onLogin, onTeacherPreview }: { onLogin: (student: StudentData) => void; onTeacherPreview: () => void }) {
-  const [classCode, setClassCode] = useState("603");
+  const [classCode, setClassCode] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [pin, setPin] = useState("");
   const [error, setError] = useState("");
@@ -197,13 +197,13 @@ function LoginVoyage({ onLogin, onTeacherPreview }: { onLogin: (student: Student
     <section className="login-card" aria-label="학생 로그인">
       <span className="login-compass">✦</span><small>WELCOME ABOARD</small><h2>나의 미래 항해 시작</h2><p>선생님께 받은 정보를 입력해 주세요.</p>
       <form onSubmit={submit}>
-        <label>학급코드<input inputMode="numeric" value={classCode} onChange={(e) => setClassCode(e.target.value.slice(0, 12))} placeholder="예: 603" autoComplete="organization" /></label>
+        <label>학급코드<input inputMode="numeric" value={classCode} onChange={(e) => setClassCode(e.target.value.slice(0, 12))} placeholder="선생님께 받은 코드" autoComplete="organization" /></label>
         <label>이름<input value={displayName} onChange={(e) => setDisplayName(e.target.value.slice(0, 30))} placeholder="이름을 입력하세요" autoComplete="name" /></label>
         <label>숫자 4자리 PIN<input type="password" inputMode="numeric" pattern="[0-9]{4}" maxLength={4} value={pin} onChange={(e) => setPin(e.target.value.replace(/\D/g, "").slice(0, 4))} placeholder="● ● ● ●" autoComplete="current-password" /></label>
         {error && <div className="login-error" role="alert">! {error}</div>}
         <button className="voyage-button" disabled={loading || voyaging}>{loading ? "확인하고 있어요…" : voyaging ? "출항합니다…" : "항해 시작"}<span>→</span></button>
       </form>
-      <div className="demo-logins"><span>체험 계정</span><button type="button" onClick={() => { setDisplayName("김민준"); setPin("3841"); }}>첫 로그인</button><button type="button" onClick={() => { setDisplayName("김하늘"); setPin("2580"); }}>성장 중</button></div>
+      <div className="login-help">계정 정보는 선생님에게 확인하세요.</div>
       <button type="button" className="teacher-preview-link" onClick={onTeacherPreview}>교사 관리자 화면 미리보기</button>
     </section>
     <p className="voyage-footer">잔잔한 파도처럼 천천히, 나만의 속도로 성장해요.</p>
@@ -375,7 +375,7 @@ function GrowthView() {
 
 function RoomView() {
   const [style, setStyle] = useState("독서형");
-  return <><section className="page-heading room-heading"><div><span className="eyebrow">나의 공간</span><h1>취향을 담는 작은 방</h1><p>저축으로 해금한 아이템을 골라 나답게 꾸며보세요.</p></div><div className="room-level"><span>다음 해금</span><strong>책장까지 700꿈</strong></div></section><div className="room-layout"><div className={`room-scene style-${style}`}><div className="room-wall"><div className="window"><i /><span /></div><div className="poster">MY<br />DREAM</div><div className="shelf"><i /><i /><i /></div></div><div className="room-floor"><div className="rug" /><div className="desk"><span>✎</span></div><div className="chair" /><div className="plant">♣</div><div className="room-avatar"><Avatar /></div></div><div className="room-label">김하늘의 {style} 마이룸</div></div><aside className="panel room-controls"><span className="eyebrow">스타일 고르기</span><h2>오늘의 분위기</h2>{["독서형", "자연형", "디지털형", "예술형", "메이커형"].map((item) => <button key={item} className={style === item ? "active" : ""} onClick={() => setStyle(item)}><i className={`swatch swatch-${item}`} /><span><strong>{item}</strong><small>{item === "독서형" ? "차분하고 포근하게" : item === "자연형" ? "초록빛으로 편안하게" : "나의 취향을 또렷하게"}</small></span>{style === item && <b>✓</b>}</button>)}</aside></div></>;
+  return <><section className="page-heading room-heading"><div><span className="eyebrow">나의 공간</span><h1>취향을 담는 작은 방</h1><p>저축으로 해금한 아이템을 골라 나답게 꾸며보세요.</p></div><div className="room-level"><span>다음 해금</span><strong>책장까지 700꿈</strong></div></section><div className="room-layout"><div className={`room-scene style-${style}`}><div className="room-wall"><div className="window"><i /><span /></div><div className="poster">MY<br />DREAM</div><div className="shelf"><i /><i /><i /></div></div><div className="room-floor"><div className="rug" /><div className="desk"><span>✎</span></div><div className="chair" /><div className="plant">♣</div><div className="room-avatar"><Avatar /></div></div><div className="room-label">나의 {style} 마이룸</div></div><aside className="panel room-controls"><span className="eyebrow">스타일 고르기</span><h2>오늘의 분위기</h2>{["독서형", "자연형", "디지털형", "예술형", "메이커형"].map((item) => <button key={item} className={style === item ? "active" : ""} onClick={() => setStyle(item)}><i className={`swatch swatch-${item}`} /><span><strong>{item}</strong><small>{item === "독서형" ? "차분하고 포근하게" : item === "자연형" ? "초록빛으로 편안하게" : "나의 취향을 또렷하게"}</small></span>{style === item && <b>✓</b>}</button>)}</aside></div></>;
 }
 
 function TeacherDashboard({ onToast }: { onToast: (message: string) => void }) {

@@ -20,6 +20,8 @@ test("keeps the student experience and 2022 competencies in the product", async 
 
   assert.match(page, /일자리 탐험/);
   assert.match(page, /나의 경제/);
+  assert.match(page, /은행원 전용/);
+  assert.match(page, /내가 보낸 신청은 다른 은행원이나 선생님이 처리합니다/);
   assert.match(page, /마이룸/);
   assert.doesNotMatch(page, /학생 순위|역량 구매|직업 Lv\./);
 });

@@ -1,8 +1,39 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 
 type StudentView = "home" | "jobs" | "wallet" | "growth" | "room";
+type StudentData = {
+  student_id: string;
+  display_name: string;
+  student_number: number;
+  first_login: boolean;
+  account_status: string;
+  basic_job: string | null;
+  cash: number;
+  savings: number;
+  housing_name: string | null;
+  growth_stage: number;
+  basic_job_tasks_completed: number;
+  jobs_completed: number;
+  first_salary_received: boolean;
+  first_saving_completed: boolean;
+  saving_goal_reached: boolean;
+  donation_count: number;
+  total_donation: number;
+  feature_unlocks: string[];
+};
+
+const viewFeature: Partial<Record<StudentView, string>> = { jobs: "job_board", wallet: "wallet", growth: "competencies", room: "my_room" };
+const featureCopy: Record<string, { title: string; condition: string }> = {
+  wallet: { title: "첫 월급과 지갑", condition: "첫 기본직업 업무를 완료하면 열립니다." },
+  bank: { title: "은행과 저축", condition: "첫 월급을 받으면 열립니다." },
+  housing: { title: "집과 자리", condition: "첫 저축을 완료하면 열립니다." },
+  job_board: { title: "새로운 직업의 세계", condition: "기본직업 업무를 2회 완료하면 열립니다." },
+  competencies: { title: "나의 여섯 가지 힘", condition: "서로 다른 업무를 4회 경험하면 열립니다." },
+  my_room: { title: "나만의 공간", condition: "저축 3,000꿈 목표를 달성하면 열립니다." },
+};
+const stageNames = ["첫걸음", "생활 시작", "직업 탐험", "성장 발견", "나의 세계", "함께하는 사회"];
 
 const jobs = [
   {
@@ -137,34 +168,105 @@ function Brand() {
   );
 }
 
-function Sidebar({ active, onChange }: { active: StudentView; onChange: (view: StudentView) => void }) {
+function LoginVoyage({ onLogin, onTeacherPreview }: { onLogin: (student: StudentData) => void; onTeacherPreview: () => void }) {
+  const [classCode, setClassCode] = useState("603");
+  const [displayName, setDisplayName] = useState("");
+  const [pin, setPin] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [voyaging, setVoyaging] = useState(false);
+
+  const submit = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!/^\d{4}$/.test(pin)) { setError("PIN은 숫자 4자리로 입력해 주세요."); return; }
+    setLoading(true); setError("");
+    try {
+      const response = await fetch("/api/student", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "login", classCode, displayName, pin }) });
+      const result = await response.json();
+      if (!response.ok || !result.ok) { setError(result.message ?? "로그인 정보를 다시 확인해 주세요."); setLoading(false); return; }
+      setVoyaging(true);
+      window.setTimeout(() => onLogin(result.student as StudentData), 950);
+    } catch { setError("지금은 항해를 시작할 수 없어요. 잠시 후 다시 시도해 주세요."); setLoading(false); }
+  };
+
+  return <main className={`voyage-login ${voyaging ? "is-voyaging" : ""}`}>
+    <div className="voyage-sky"><span className="cloud cloud-a" /><span className="cloud cloud-b" /><span className="sun-glow" /></div>
+    <div className="voyage-copy"><div className="voyage-brand"><span>F</span> FUTURE ODYSSEY</div><p>교실에서 시작하는 나의 미래 항해</p><h1>작은 배 한 척으로<br /><em>나의 가능성</em>을 만나러 가요.</h1><div className="route-dots"><i /><i /><i /><span>새로운 항로</span></div></div>
+    <div className="sea-layer sea-back" /><div className="sea-layer sea-front" />
+    <div className="little-boat" aria-hidden="true"><span className="boat-sail" /><span className="boat-mast" /><span className="boat-hull" /></div>
+    <section className="login-card" aria-label="학생 로그인">
+      <span className="login-compass">✦</span><small>WELCOME ABOARD</small><h2>나의 미래 항해 시작</h2><p>선생님께 받은 정보를 입력해 주세요.</p>
+      <form onSubmit={submit}>
+        <label>학급코드<input inputMode="numeric" value={classCode} onChange={(e) => setClassCode(e.target.value.slice(0, 12))} placeholder="예: 603" autoComplete="organization" /></label>
+        <label>이름<input value={displayName} onChange={(e) => setDisplayName(e.target.value.slice(0, 30))} placeholder="이름을 입력하세요" autoComplete="name" /></label>
+        <label>숫자 4자리 PIN<input type="password" inputMode="numeric" pattern="[0-9]{4}" maxLength={4} value={pin} onChange={(e) => setPin(e.target.value.replace(/\D/g, "").slice(0, 4))} placeholder="● ● ● ●" autoComplete="current-password" /></label>
+        {error && <div className="login-error" role="alert">! {error}</div>}
+        <button className="voyage-button" disabled={loading || voyaging}>{loading ? "확인하고 있어요…" : voyaging ? "출항합니다…" : "항해 시작"}<span>→</span></button>
+      </form>
+      <div className="demo-logins"><span>체험 계정</span><button type="button" onClick={() => { setDisplayName("김민준"); setPin("3841"); }}>첫 로그인</button><button type="button" onClick={() => { setDisplayName("김하늘"); setPin("2580"); }}>성장 중</button></div>
+      <button type="button" className="teacher-preview-link" onClick={onTeacherPreview}>교사 관리자 화면 미리보기</button>
+    </section>
+    <p className="voyage-footer">잔잔한 파도처럼 천천히, 나만의 속도로 성장해요.</p>
+  </main>;
+}
+
+function PinSetup({ student, onComplete }: { student: StudentData; onComplete: (student: StudentData) => void }) {
+  const [pin, setPin] = useState(""); const [confirm, setConfirm] = useState(""); const [error, setError] = useState(""); const [loading, setLoading] = useState(false);
+  const submit = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!/^\d{4}$/.test(pin)) { setError("숫자 4자리로 만들어 주세요."); return; }
+    if (pin !== confirm) { setError("두 PIN이 서로 달라요. 다시 확인해 주세요."); return; }
+    setLoading(true); setError("");
+    const response = await fetch("/api/student", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "change-pin", pin }) });
+    const result = await response.json(); setLoading(false);
+    if (!response.ok || !result.ok) { setError(result.message ?? "PIN을 바꾸지 못했어요."); return; }
+    onComplete(result.student as StudentData);
+  };
+  return <main className="pin-page"><section className="pin-card"><span className="pin-lock">⌾</span><small>첫 항해 준비</small><h1>{student.display_name}님만의 비밀번호를<br />만들어 주세요.</h1><p>앞으로 Future Odyssey에 들어올 때 사용할 PIN이에요.</p><form onSubmit={submit}><label>새 PIN<input type="password" inputMode="numeric" maxLength={4} value={pin} onChange={(e) => setPin(e.target.value.replace(/\D/g, ""))} placeholder="○ ○ ○ ○" /></label><label>PIN 확인<input type="password" inputMode="numeric" maxLength={4} value={confirm} onChange={(e) => setConfirm(e.target.value.replace(/\D/g, ""))} placeholder="○ ○ ○ ○" /></label>{error && <div className="login-error" role="alert">! {error}</div>}<button className="voyage-button" disabled={loading}>{loading ? "저장하고 있어요…" : "내 비밀번호로 설정하기"}</button></form><div className="pin-guide">🔒 친구에게 알려주지 마세요. 선생님도 지금 PIN을 볼 수 없어요.</div></section></main>;
+}
+
+function FirstOnboarding({ student, onStart }: { student: StudentData; onStart: () => void }) {
+  return <main className="onboarding-page"><div className="onboarding-route"><i /><i /><i /></div><section className="onboarding-card"><span className="eyebrow">WELCOME TO FUTURE ODYSSEY</span><h1>{student.display_name}님의 첫 항해를<br />환영합니다!</h1><p>처음에는 작은 배 한 척이면 충분해요.<br />첫 직업에서 하나씩 경험하며 새로운 항로를 만나 보세요.</p><div className="first-job-card"><Avatar /><div><small>나의 첫 직업</small><h2>{student.basic_job ?? "직업 배정 대기"}</h2><span>첫 번째 업무</span><strong>{student.basic_job === "기자" ? "우리 반의 좋은 소식 한 가지 찾기" : "기본직업 업무를 확인하기"}</strong></div></div><button className="voyage-button" onClick={onStart}>나의 미래여정 시작 <span>→</span></button></section></main>;
+}
+
+function LockedFeature({ feature, student, onBack }: { feature: string; student: StudentData; onBack: () => void }) {
+  const copy = featureCopy[feature] ?? { title: "아직 만나지 않은 항로", condition: "조금 더 경험하면 열립니다." };
+  const current = feature === "job_board" ? student.basic_job_tasks_completed : feature === "my_room" ? student.savings : student.basic_job_tasks_completed;
+  const target = feature === "job_board" ? 2 : feature === "my_room" ? 3000 : 4;
+  return <main className="locked-page"><section className="locked-route-card"><div className="locked-compass">⌖</div><span className="eyebrow">아직 닿지 않은 항로</span><h1>{copy.title}</h1><p>{copy.condition}</p><div className="unlock-progress-copy"><span>현재 진행</span><strong>{current.toLocaleString()} / {target.toLocaleString()}</strong></div><div className="progress purple"><i style={{ width: `${Math.min(100, current / target * 100)}%` }} /></div><small>복잡한 점수 대신 실제로 해본 활동만 세어요.</small><button className="secondary-button" onClick={onBack}>오늘의 생활로 돌아가기</button></section></main>;
+}
+
+function Sidebar({ active, onChange, student, onLogout }: { active: StudentView; onChange: (view: StudentView) => void; student: StudentData; onLogout: () => void }) {
+  const lockedViews = studentNav.filter((item) => viewFeature[item.id] && !student.feature_unlocks.includes(viewFeature[item.id]!)).slice(0, 2).map((item) => item.id);
+  const visibleItems = studentNav.filter((item) => !viewFeature[item.id] || student.feature_unlocks.includes(viewFeature[item.id]!) || lockedViews.includes(item.id));
   return (
     <aside className="sidebar">
       <Brand />
       <nav aria-label="학생 메뉴" className="side-nav">
-        {studentNav.map((item) => (
-          <button key={item.id} className={active === item.id ? "active" : ""} onClick={() => onChange(item.id)}>
-            <span>{item.icon}</span>{item.label}
+        {visibleItems.map((item) => {
+          const locked = Boolean(viewFeature[item.id] && !student.feature_unlocks.includes(viewFeature[item.id]!));
+          return <button key={item.id} className={`${active === item.id ? "active" : ""} ${locked ? "nav-locked" : ""}`} onClick={() => onChange(item.id)}>
+            <span>{locked ? "◌" : item.icon}</span><span className="nav-copy">{item.label}{locked && <small>{featureCopy[viewFeature[item.id]!]?.condition}</small>}</span>
           </button>
-        ))}
+        })}
       </nav>
       <div className="side-tip">
         <span>💡</span>
         <strong>이번 주 작은 질문</strong>
         <p>어떤 일을 할 때 시간이 빨리 갔나요?</p>
       </div>
-      <div className="side-profile"><Avatar small /><span><strong>김하늘</strong><small>은행원 · 5주차</small></span><button aria-label="설정">•••</button></div>
+      <div className="side-profile"><Avatar small /><span><strong>{student.display_name}</strong><small>{student.basic_job ?? "직업 대기"} · {stageNames[student.growth_stage - 1]}</small></span><button aria-label="로그아웃" title="로그아웃" onClick={onLogout}>↪</button></div>
     </aside>
   );
 }
 
-function Topbar({ teacher, onRole }: { teacher: boolean; onRole: () => void }) {
+function Topbar({ teacher, onRole }: { teacher: boolean; onRole?: () => void }) {
   return (
     <header className="topbar">
       <div className="mobile-brand"><Brand /></div>
       <div className="week-pill"><span /> 2학기 · 5주차</div>
       <div className="top-actions">
-        <button className="role-switch" onClick={onRole}>{teacher ? "학생 화면 보기" : "교사 화면 보기"}</button>
+        {onRole && <button className="role-switch" onClick={onRole}>{teacher ? "로그인 화면으로" : "교사 화면 보기"}</button>}
         <button className="icon-button" aria-label="알림">♢<i /></button>
       </div>
     </header>
@@ -228,20 +330,28 @@ function CommunityCard({ donated, onDonate }: { donated: boolean; onDonate: () =
   );
 }
 
-function StudentHome({ applied, setApplied, donated, onDonate }: { applied: number[]; setApplied: (id: number) => void; donated: boolean; onDonate: () => void }) {
+function StarterHome({ student, onCompleteTask, busy }: { student: StudentData; onCompleteTask: () => void; busy: boolean }) {
+  const completed = student.basic_job_tasks_completed;
+  return <>
+    <section className="welcome-row"><div><span className="eyebrow">{stageNames[student.growth_stage - 1]} · 첫 항해</span><h1>{student.display_name}님의 세계는 지금부터 <em>천천히</em> 넓어져요.</h1><p>오늘은 첫 직업과 첫 번째 업무에만 집중해 보세요.</p></div></section>
+    <section className="profile-hero starter-hero"><div className="profile-art"><div className="spark spark-a">✦</div><Avatar /></div><div className="profile-copy"><span className="job-chip">나의 첫 직업</span><h2>우리 반의 <em>{student.basic_job ?? "새로운 역할"}</em></h2><p>{student.basic_job === "기자" ? "우리 반의 좋은 소식을 발견하고 친구들에게 알기 쉽게 전하는 역할이에요." : "교실에서 맡은 첫 역할을 경험하며 나의 강점을 찾아가요."}</p><div className="role-tasks"><span>✓ 주변을 자세히 살펴보기</span><span>✓ 친구의 이야기를 잘 듣기</span></div></div><div className="week-mission"><span>첫 번째 업무</span><strong>{student.basic_job === "기자" ? "우리 반의 좋은 소식 한 가지 찾기" : "기본직업 업무 확인하기"}</strong><div className="mission-progress"><i style={{ width: completed > 0 ? "100%" : "8%" }} /></div><small>{completed > 0 ? "완료했어요! 첫 월급을 확인해 보세요." : "실제 교실 활동을 마치고 완료를 눌러요."}</small></div></section>
+    <section className="first-task-panel"><div className="first-task-route"><span className="route-start">⚑</span><i /><span className="route-lock">₩</span><i /><span className="route-lock">▥</span></div><div><span className="eyebrow">다음에 열릴 항로</span><h2>첫 업무를 마치면 지갑과 은행을 발견해요</h2><p>첫 월급 800꿈이 지급되고, 내가 번 돈을 확인하고 저축할 수 있게 돼요.</p><button className="apply-button" onClick={onCompleteTask} disabled={busy || completed > 0}>{busy ? "기록하고 있어요…" : completed > 0 ? "첫 업무 완료 ✓" : "첫 업무 완료하기"}</button></div></section>
+  </>;
+}
+
+function StudentHome({ student, applied, setApplied, donated, onDonate }: { student: StudentData; applied: number[]; setApplied: (id: number) => void; donated: boolean; onDonate: () => void }) {
   return (
     <>
-      <section className="welcome-row"><div><span className="eyebrow">좋은 아침이에요</span><h1>하늘님의 오늘도 <em>멋진 탐험</em>이 기다려요!</h1><p>이번 주에는 새로운 일을 하나 경험해 볼까요?</p></div><div className="weather-note"><span>☀</span><p><strong>맑음 · 27°</strong><small>새로운 도전에 좋은 날!</small></p></div></section>
+      <section className="welcome-row"><div><span className="eyebrow">{stageNames[student.growth_stage - 1]} · 좋은 아침이에요</span><h1>{student.display_name}님의 오늘도 <em>멋진 탐험</em>이 기다려요!</h1><p>이번 주에는 새로운 일을 하나 경험해 볼까요?</p></div><div className="weather-note"><span>☀</span><p><strong>맑음 · 27°</strong><small>새로운 도전에 좋은 날!</small></p></div></section>
       <section className="profile-hero">
         <div className="profile-art"><div className="spark spark-a">✦</div><div className="spark spark-b">✦</div><Avatar /></div>
-        <div className="profile-copy"><span className="job-chip">정보와 돈을 다루는 일</span><h2>우리 반 든든한 <em>은행원</em></h2><p>친구들의 저축을 돕고, 안전한 거래를 확인하는 금융업무 담당자예요.</p><div className="role-tasks"><span>✓ 저축 신청 확인</span><span>✓ 저축 상담</span><span>✓ 이상 거래 보고</span></div><button className="text-button">나의 직업 자세히 보기 →</button></div>
-        <div className="week-mission"><span>이번 주 기본 업무</span><strong>저축 신청 3건 확인하기</strong><div className="mission-progress"><i style={{ width: "66%" }} /></div><small>2 / 3건 완료 · 조금만 더!</small></div>
+        <div className="profile-copy"><span className="job-chip">나의 기본직업</span><h2>우리 반의 <em>{student.basic_job ?? "새로운 역할"}</em></h2><p>맡은 역할을 꾸준히 경험하며 나에게 맞는 일과 강점을 발견해요.</p><div className="role-tasks"><span>✓ 기본 업무 확인</span><span>✓ 친구와 협력</span><span>✓ 경험 기록</span></div><button className="text-button">나의 직업 자세히 보기 →</button></div>
+        <div className="week-mission"><span>기본직업 업무 경험</span><strong>{student.basic_job_tasks_completed}번의 일을 해봤어요</strong><div className="mission-progress"><i style={{ width: `${Math.min(100, student.basic_job_tasks_completed / 4 * 100)}%` }} /></div><small>경험할수록 새로운 항로가 열려요.</small></div>
       </section>
-      <section className="money-grid"><MoneyCard label="현재 현금" value="2,450 꿈" detail="이번 주 +500" icon="₩" tone="purple" /><MoneyCard label="차곡차곡 저축" value="2,300 꿈" detail="다음 해금까지 700" icon="▥" tone="green" /><MoneyCard label="나의 자리" value="창가형 B-3" detail="주거비 300 / 주" icon="⌑" tone="orange" /></section>
-      <section className="section-head"><div><span className="eyebrow">이번 주 일자리</span><h2>새로운 일을 탐험해 봐요</h2><p>기본직업과 달라도 괜찮아요. 마음이 가는 일을 골라보세요.</p></div><button>공고 전체 보기 →</button></section>
-      <div className="job-grid home-jobs">{jobs.slice(0, 3).map((job) => <JobCard key={job.id} job={job} applied={applied.includes(job.id)} onApply={() => setApplied(job.id)} />)}</div>
-      <div className="dashboard-grid"><RadarCard /><article className="panel savings-card"><div className="panel-title"><div><span className="eyebrow">저축 목표</span><h2>다음 마이룸 아이템</h2></div><span className="tiny-badge">독서형</span></div><div className="unlock-art"><div className="bookshelf"><span /><span /><span /><span /></div><div className="locked">🔒</div></div><h3>포근한 원목 책장</h3><p>저축 3,000꿈을 유지하면 해금돼요.</p><div className="fund-row"><span>2,300꿈 모음</span><strong>77%</strong></div><div className="progress purple"><i style={{ width: "77%" }} /></div><small className="remaining">700꿈만 더 모으면 만날 수 있어요!</small><button className="secondary-button">저축하러 가기</button></article></div>
-      <CommunityCard donated={donated} onDonate={onDonate} />
+      <section className="money-grid"><MoneyCard label="현재 현금" value={`${student.cash.toLocaleString()} 꿈`} detail="내가 일해서 번 돈" icon="₩" tone="purple" />{student.feature_unlocks.includes("bank") && <MoneyCard label="차곡차곡 저축" value={`${student.savings.toLocaleString()} 꿈`} detail={`마이룸까지 ${Math.max(0, 3000 - student.savings).toLocaleString()}`} icon="▥" tone="green" />}{student.feature_unlocks.includes("housing") && <MoneyCard label="나의 자리" value={student.housing_name ?? "자리 배정 대기"} detail="집과 생활 항로" icon="⌑" tone="orange" />}</section>
+      {student.feature_unlocks.includes("job_board") && <><section className="section-head"><div><span className="eyebrow">이번 주 일자리</span><h2>새로운 일을 탐험해 봐요</h2><p>기본직업과 달라도 괜찮아요. 마음이 가는 일을 골라보세요.</p></div><button>공고 전체 보기 →</button></section><div className="job-grid home-jobs">{jobs.slice(0, 3).map((job) => <JobCard key={job.id} job={job} applied={applied.includes(job.id)} onApply={() => setApplied(job.id)} />)}</div></>}
+      <div className={`dashboard-grid ${student.feature_unlocks.includes("competencies") ? "" : "single-card"}`}>{student.feature_unlocks.includes("competencies") && <RadarCard />}<article className="panel savings-card"><div className="panel-title"><div><span className="eyebrow">저축 목표</span><h2>다음 마이룸 아이템</h2></div><span className="tiny-badge">독서형</span></div><div className="unlock-art"><div className="bookshelf"><span /><span /><span /><span /></div><div className="locked">🔒</div></div><h3>포근한 원목 책장</h3><p>저축 3,000꿈을 유지하면 해금돼요.</p><div className="fund-row"><span>{student.savings.toLocaleString()}꿈 모음</span><strong>{Math.min(100, Math.round(student.savings / 3000 * 100))}%</strong></div><div className="progress purple"><i style={{ width: `${Math.min(100, student.savings / 3000 * 100)}%` }} /></div><small className="remaining">{Math.max(0, 3000 - student.savings).toLocaleString()}꿈만 더 모으면 만날 수 있어요!</small><button className="secondary-button">저축하러 가기</button></article></div>
+      {student.feature_unlocks.includes("community_fund") && <CommunityCard donated={donated} onDonate={onDonate} />}
       <section className="panel recent-panel"><div className="panel-title"><div><span className="eyebrow">나의 발자국</span><h2>최근에 이런 일을 했어요</h2></div><button>전체 기록 보기 →</button></div><div className="timeline"><div><span className="timeline-icon violet">✎</span><p><strong>친구 인터뷰 완료</strong><small>기자 업무 · 재미있음 5 · 협력적 소통 +3 · 공동체 +1</small></p><b>어제</b></div><div><span className="timeline-icon green">₩</span><p><strong>저축 상담 2건 확인</strong><small>기본직업 은행원 · 자기관리 +1 · 협력적 소통 +1</small></p><b>3일 전</b></div><div><span className="timeline-icon orange">✦</span><p><strong>행사 이름표 디자인</strong><small>디자인 업무 · 심미적 감성 +3 · 창의적 사고 +2</small></p><b>지난주</b></div></div></section>
     </>
   );
@@ -253,12 +363,10 @@ function JobsView({ applied, setApplied }: { applied: number[]; setApplied: (id:
   return <><section className="page-heading"><span className="eyebrow">일자리 탐험</span><h1>이번 주, 어떤 일을 해볼까요?</h1><p>잘해야 하는 일이 아니라 궁금한 일을 골라보세요. 공고의 성장값은 활동에서 실제로 사용하는 2022 개정 교육과정 핵심역량을 기준으로 정했어요.</p></section><div className="filter-row">{filters.map((item) => <button key={item} onClick={() => setFilter(item)} className={filter === item ? "active" : ""}>{item}</button>)}</div><div className="jobs-summary"><strong>열린 공고 4개</strong><span>내가 지원한 공고 {applied.length}개</span><span>이번 주 남은 자리 7명</span></div><div className="job-grid all-jobs">{jobs.map((job) => <JobCard key={job.id} job={job} applied={applied.includes(job.id)} onApply={() => setApplied(job.id)} />)}</div></>;
 }
 
-function WalletView({ donated, onDonate }: { donated: boolean; onDonate: () => void }) {
-  const [cash, setCash] = useState(2450);
-  const [saving, setSaving] = useState(2300);
-  const save = () => { if (cash >= 100) { setCash(cash - 100); setSaving(saving + 100); } };
-  const withdraw = () => { if (saving >= 100) { setSaving(saving - 100); setCash(cash + 100); } };
-  return <><section className="page-heading"><span className="eyebrow">나의 경제</span><h1>돈이 어디에서 오고, 어디로 갈까요?</h1><p>월급을 받고, 생활비를 내고, 저축과 나눔을 직접 경험해요.</p></section><div className="wallet-balance"><div><span>사용할 수 있는 현금</span><strong>{cash.toLocaleString()} <small>꿈</small></strong><p>이번 주 예상 월세 300꿈</p></div><div><span>차곡차곡 저축</span><strong>{saving.toLocaleString()} <small>꿈</small></strong><p>3,000꿈에 책장 해금</p></div><div className="wallet-actions"><button onClick={save}>+ 100꿈 저축 신청</button><button onClick={withdraw}>100꿈 출금 신청</button></div></div><div className="dashboard-grid wallet-grid"><article className="panel"><div className="panel-title"><div><span className="eyebrow">거래 기록</span><h2>최근 흐름</h2></div><button>전체 보기</button></div><div className="transaction-list"><div><span className="timeline-icon green">↙</span><p><strong>기본직업 월급</strong><small>5주차 주간 정산</small></p><b className="plus">+800꿈</b></div><div><span className="timeline-icon violet">▥</span><p><strong>저축</strong><small>은행원 확인 완료</small></p><b>-300꿈</b></div><div><span className="timeline-icon orange">⌂</span><p><strong>창가형 자리 주거비</strong><small>5주차 주간 정산</small></p><b>-300꿈</b></div><div><span className="timeline-icon violet">✦</span><p><strong>친구 인터뷰 보수</strong><small>업무 완료 자동 지급</small></p><b className="plus">+250꿈</b></div></div></article><article className="panel settlement-card"><span className="eyebrow">금요일 예상 정산</span><h2>이번 주 미리 보기</h2><div><span>은행원 월급</span><strong>+800꿈</strong></div><div><span>완료 공고 보수</span><strong>+300꿈</strong></div><div><span>창가형 주거비</span><strong>-300꿈</strong></div><hr /><div className="settlement-total"><span>예상 변화</span><strong>+800꿈</strong></div><small>정산은 선생님이 금요일에 한 번에 실행해요.</small></article></div><CommunityCard donated={donated} onDonate={onDonate} /></>;
+function WalletView({ student, donated, onDonate, onSave, busy }: { student: StudentData; donated: boolean; onDonate: () => void; onSave: () => void; busy: boolean }) {
+  const bankOpen = student.feature_unlocks.includes("bank");
+  const housingOpen = student.feature_unlocks.includes("housing");
+  return <><section className="page-heading"><span className="eyebrow">나의 경제</span><h1>돈이 어디에서 오고, 어디로 갈까요?</h1><p>월급을 받고, 생활비를 내고, 저축과 나눔을 직접 경험해요.</p></section><div className="wallet-balance"><div><span>사용할 수 있는 현금</span><strong>{student.cash.toLocaleString()} <small>꿈</small></strong><p>{housingOpen ? "이번 주 예상 월세 300꿈" : "첫 월급부터 차근차근 시작해요"}</p></div><div className={bankOpen ? "" : "soft-locked"}><span>차곡차곡 저축</span><strong>{bankOpen ? student.savings.toLocaleString() : "—"} <small>꿈</small></strong><p>{bankOpen ? "3,000꿈에 마이룸 해금" : "첫 월급을 받으면 은행이 열려요"}</p></div><div className="wallet-actions"><button onClick={onSave} disabled={!bankOpen || busy || student.cash < 100}>{busy ? "처리 중…" : "+ 100꿈 저축하기"}</button><button disabled>출금은 은행원 확인 후 가능</button></div></div><div className="dashboard-grid wallet-grid"><article className="panel"><div className="panel-title"><div><span className="eyebrow">거래 기록</span><h2>최근 흐름</h2></div></div><div className="transaction-list"><div><span className="timeline-icon green">↙</span><p><strong>기본직업 첫 월급</strong><small>기본 업무 완료 후 자동 지급</small></p><b className="plus">+800꿈</b></div>{student.first_saving_completed && <div><span className="timeline-icon violet">▥</span><p><strong>첫 저축</strong><small>나의 경제 경험이 한 칸 넓어졌어요</small></p><b>-100꿈</b></div>}{housingOpen && <div><span className="timeline-icon orange">⌂</span><p><strong>{student.housing_name ?? "나의 자리"}</strong><small>집과 자리 기능이 열렸어요</small></p><b>발견</b></div>}</div></article><article className="panel settlement-card"><span className="eyebrow">나의 다음 항로</span><h2>{student.savings >= 3000 ? "마이룸이 열렸어요!" : "저축 목표 3,000꿈"}</h2><div><span>현재 저축</span><strong>{student.savings.toLocaleString()}꿈</strong></div><div><span>남은 금액</span><strong>{Math.max(0, 3000 - student.savings).toLocaleString()}꿈</strong></div><div className="progress purple"><i style={{ width: `${Math.min(100, student.savings / 3000 * 100)}%` }} /></div><small>돈을 쓰는 대신 저축을 유지하면 나만의 공간이 열려요.</small></article></div>{student.feature_unlocks.includes("community_fund") && <CommunityCard donated={donated} onDonate={onDonate} />}</>;
 }
 
 function GrowthView() {
@@ -279,7 +387,12 @@ function TeacherDashboard({ onToast }: { onToast: (message: string) => void }) {
 }
 
 export default function Home() {
-  const [teacher, setTeacher] = useState(false);
+  const [teacherPreview, setTeacherPreview] = useState(false);
+  const [student, setStudent] = useState<StudentData | null>(null);
+  const [checkingSession, setCheckingSession] = useState(true);
+  const [showOnboarding, setShowOnboarding] = useState(false);
+  const [lockedFeature, setLockedFeature] = useState("");
+  const [busy, setBusy] = useState(false);
   const [active, setActive] = useState<StudentView>("home");
   const [applied, setApplied] = useState<number[]>([]);
   const [donated, setDonated] = useState(false);
@@ -288,13 +401,56 @@ export default function Home() {
   const notify = (message: string) => { setToast(message); window.setTimeout(() => setToast(""), 2800); };
   const apply = (id: number) => { if (!applied.includes(id)) { setApplied([...applied, id]); notify("지원했어요! 실제 교실 활동에서 만나요."); } };
   const donate = () => { if (!donated) { setDonated(true); notify("공동체기금에 100꿈을 보탰어요. 고마워요!"); } };
+
+  useEffect(() => {
+    fetch("/api/student", { cache: "no-store" }).then(async (response) => {
+      if (!response.ok) return;
+      const result = await response.json();
+      if (result.ok) setStudent(result.student as StudentData);
+    }).finally(() => setCheckingSession(false));
+  }, []);
+
+  const postAction = async (action: string, extra: Record<string, unknown> = {}) => {
+    setBusy(true);
+    try {
+      const response = await fetch("/api/student", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action, ...extra }) });
+      const result = await response.json();
+      if (!response.ok || !result.ok) { notify(result.message ?? "처리하지 못했어요."); return null; }
+      if (result.student) setStudent(result.student as StudentData);
+      return result.student as StudentData | undefined;
+    } finally { setBusy(false); }
+  };
+  const completeTask = async () => {
+    const before = new Set(student?.feature_unlocks ?? []); const updated = await postAction("complete-task");
+    if (updated) notify(!before.has("wallet") && updated.feature_unlocks.includes("wallet") ? "새로운 항로 발견! 첫 월급과 지갑이 열렸어요." : "기본직업 업무를 기록했어요.");
+  };
+  const saveMoney = async () => {
+    const before = new Set(student?.feature_unlocks ?? []); const updated = await postAction("save", { amount: 100 });
+    if (updated) notify(!before.has("housing") && updated.feature_unlocks.includes("housing") ? "새로운 항로 발견! 집과 자리 기능이 열렸어요." : "100꿈을 안전하게 저축했어요.");
+  };
+  const logout = async () => { await postAction("logout"); setStudent(null); setTeacherPreview(false); setActive("home"); setLockedFeature(""); };
+  const changeView = (view: StudentView) => {
+    if (!student) return;
+    const required = viewFeature[view];
+    if (required && !student.feature_unlocks.includes(required)) { setLockedFeature(required); return; }
+    setLockedFeature(""); setActive(view);
+  };
+
+  if (checkingSession) return <main className="session-loading"><Brand /><div className="loading-wave"><i /><i /><i /></div><p>나의 항해 기록을 불러오고 있어요…</p></main>;
+  if (teacherPreview) return <div className="app teacher-mode"><div className="main-column"><Topbar teacher onRole={() => setTeacherPreview(false)} /><TeacherDashboard onToast={notify} /></div>{toast && <div className="toast" role="status"><span>✓</span>{toast}</div>}</div>;
+  if (!student) return <LoginVoyage onLogin={setStudent} onTeacherPreview={() => setTeacherPreview(true)} />;
+  if (student.first_login) return <PinSetup student={student} onComplete={(updated) => { setStudent(updated); setShowOnboarding(true); }} />;
+  if (showOnboarding) return <FirstOnboarding student={student} onStart={() => setShowOnboarding(false)} />;
+
+  const lockedViews = studentNav.filter((item) => viewFeature[item.id] && !student.feature_unlocks.includes(viewFeature[item.id]!)).slice(0, 2).map((item) => item.id);
+  const mobileItems = studentNav.filter((item) => !viewFeature[item.id] || student.feature_unlocks.includes(viewFeature[item.id]!) || lockedViews.includes(item.id));
   return (
-    <div className={teacher ? "app teacher-mode" : "app"}>
-      {!teacher && <Sidebar active={active} onChange={setActive} />}
+    <div className="app">
+      <Sidebar active={active} onChange={changeView} student={student} onLogout={logout} />
       <div className="main-column">
-        <Topbar teacher={teacher} onRole={() => setTeacher(!teacher)} />
-        {teacher ? <TeacherDashboard onToast={notify} /> : <main className="content" aria-label={title}>{active === "home" && <StudentHome applied={applied} setApplied={apply} donated={donated} onDonate={donate} />}{active === "jobs" && <JobsView applied={applied} setApplied={apply} />}{active === "wallet" && <WalletView donated={donated} onDonate={donate} />}{active === "growth" && <GrowthView />}{active === "room" && <RoomView />}</main>}
-        {!teacher && <nav className="mobile-nav" aria-label="모바일 학생 메뉴">{studentNav.map((item) => <button key={item.id} className={active === item.id ? "active" : ""} onClick={() => setActive(item.id)}><span>{item.icon}</span>{item.label.split(" ")[0]}</button>)}</nav>}
+        <Topbar teacher={false} />
+        <main className="content" aria-label={title}>{lockedFeature ? <LockedFeature feature={lockedFeature} student={student} onBack={() => { setLockedFeature(""); setActive("home"); }} /> : <>{active === "home" && (student.feature_unlocks.includes("wallet") ? <StudentHome student={student} applied={applied} setApplied={apply} donated={donated} onDonate={donate} /> : <StarterHome student={student} onCompleteTask={completeTask} busy={busy} />)}{active === "jobs" && <JobsView applied={applied} setApplied={apply} />}{active === "wallet" && <WalletView student={student} donated={donated} onDonate={donate} onSave={saveMoney} busy={busy} />}{active === "growth" && <GrowthView />}{active === "room" && <RoomView />}</>}</main>
+        <nav className="mobile-nav" aria-label="모바일 학생 메뉴">{mobileItems.map((item) => { const locked = Boolean(viewFeature[item.id] && !student.feature_unlocks.includes(viewFeature[item.id]!)); return <button key={item.id} className={`${active === item.id ? "active" : ""} ${locked ? "nav-locked" : ""}`} onClick={() => changeView(item.id)}><span>{locked ? "◌" : item.icon}</span>{item.label.split(" ")[0]}</button> })}</nav>
       </div>
       {toast && <div className="toast" role="status"><span>✓</span>{toast}</div>}
     </div>

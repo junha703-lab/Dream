@@ -48,6 +48,7 @@ export async function POST(request: Request) {
       "update-seat": ["fo_teacher_update_seat", { p_seat_id: String(body.seatId ?? ""), p_name: String(body.name ?? ""), p_type: String(body.type ?? ""), p_rent: Number(body.rent ?? 0), p_move_cost: Number(body.moveCost ?? 0), p_active: Boolean(body.active) }],
       "update-goal": ["fo_teacher_upsert_goal", { p_title: String(body.title ?? ""), p_description: String(body.description ?? ""), p_target: Number(body.target ?? 0), p_min_donations: Number(body.minDonations ?? 0) }],
       "create-template": ["fo_teacher_create_template", { p_title: String(body.title ?? ""), p_description: String(body.description ?? ""), p_world_key: String(body.worldKey ?? ""), p_related_job_codes: Array.isArray(body.relatedJobCodes) ? body.relatedJobCodes.map(String) : [], p_capacity: Number(body.capacity ?? 0), p_reward: Number(body.reward ?? 0), p_duration: Number(body.duration ?? 0), p_competency_rewards: body.competencyRewards ?? {}, p_submission_method: String(body.submissionMethod ?? ""), p_repeatable: Boolean(body.repeatable) }],
+      "review-job-evidence": ["fo_teacher_review_job_evidence", { p_application_id: String(body.applicationId ?? ""), p_decision: String(body.decision ?? ""), p_feedback: String(body.feedback ?? "") }],
       "resolve-exception": ["fo_teacher_resolve_exception", { p_exception_id: String(body.exceptionId ?? "") }],
     };
     if (action === "logout") {

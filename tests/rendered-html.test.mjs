@@ -109,3 +109,26 @@ test("makes an active teacher week and expired sessions explicit", async () => {
   assert.match(teacherApi, /SESSION_EXPIRED/);
   assert.match(teacherApi, /clearSessionCookie\(request, TEACHER_SESSION_COOKIE\)/);
 });
+
+test("keeps locked job postings hidden and connects evidence review end to end", async () => {
+  const [page, studentApi, teacherApi, migration] = await Promise.all([
+    readFile(new URL("app/page.tsx", root), "utf8"),
+    readFile(new URL("app/api/student/route.ts", root), "utf8"),
+    readFile(new URL("app/api/teacher/route.ts", root), "utf8"),
+    readFile(new URL("supabase/migrations/20260810130000_align_job_board_and_evidence_review.sql", root), "utf8"),
+  ]);
+
+  assert.match(page, /jobBoardUnlocked \? student\.postings\.length/);
+  assert.match(page, /전체 공고·내 활동 보기/);
+  assert.match(page, /활동 기록·완료하기/);
+  assert.match(page, /학생 제출 기록/);
+  assert.match(page, /보완 요청/);
+  assert.match(page, /resubmit-job-evidence/);
+  assert.match(studentApi, /fo_student_resubmit_job_evidence/);
+  assert.match(teacherApi, /fo_teacher_review_job_evidence/);
+  assert.match(migration, /job_submissions/);
+  assert.match(migration, /evidence_review_status/);
+  assert.match(migration, /student_id=sid/);
+  assert.match(migration, /cw\.class_id=cid/);
+  assert.match(migration, /revoke all on function private\.student_context/);
+});

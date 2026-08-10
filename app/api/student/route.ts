@@ -95,6 +95,17 @@ export async function POST(request: Request) {
       });
       return json(result, result.ok ? 200 : 400);
     }
+    if (action === "resubmit-job-evidence") {
+      const result = await callSupabaseRpc<RpcResult>("fo_student_resubmit_job_evidence", {
+        p_session_token: token,
+        p_application_id: String(body.applicationId ?? ""),
+        p_summary: String(body.summary ?? ""),
+        p_result_url: String(body.resultUrl ?? ""),
+        p_fun: Number(body.fun ?? 0),
+        p_difficulty: Number(body.difficulty ?? 0),
+      });
+      return json(result, result.ok ? 200 : 400);
+    }
     if (action === "bank-request") {
       const result = await callSupabaseRpc<RpcResult>("fo_student_bank_request", { p_session_token: token, p_type: String(body.type ?? ""), p_amount: Number(body.amount ?? 0) });
       return json(result, result.ok ? 200 : 400);

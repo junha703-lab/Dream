@@ -3,456 +3,146 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 
 type StudentView = "home" | "jobs" | "wallet" | "growth" | "room";
+type Competency = { key: string; name: string; xp: number; color: string };
+type Posting = { id: string; title: string; description: string; world: string; capacity: number; assigned_count: number; reward: number; duration_minutes: number; competency_rewards: Record<string, number>; submission_method: string; status: string };
+type Application = { id: string; posting_id: string; title: string; status: string; summary?: string; fun_rating?: number; difficulty_rating?: number; completed_at?: string };
+type Transaction = { id: number; transaction_type: string; cash_delta: number; savings_delta: number; cash_after: number; savings_after: number; created_at: string };
+type BankRequest = { id: string; request_type: string; amount: number; status: string; requested_at?: string };
+type BankQueue = { id: string; student_name: string; request_type: string; amount: number; requested_at: string };
+type Badge = { key: string; name: string; description: string; icon: string; awarded_at: string };
+type RoomItem = { key: string; name: string; slot: string; style: string; required: number; visual: string; unlocked: boolean; equipped: boolean };
+type Seat = { id: string; code: string; name: string; type: string; rent: number; move_cost: number; available: boolean };
+type CommunityGoal = { id?: string; title?: string; description?: string; target_amount?: number; current_amount?: number; min_donations?: number; qualified_students?: number; total_students?: number; status?: string };
 type StudentData = {
-  student_id: string;
-  display_name: string;
-  student_number: number;
-  first_login: boolean;
-  account_status: string;
-  basic_job: string | null;
-  cash: number;
-  savings: number;
-  housing_name: string | null;
-  growth_stage: number;
-  basic_job_tasks_completed: number;
-  jobs_completed: number;
-  first_salary_received: boolean;
-  first_saving_completed: boolean;
-  saving_goal_reached: boolean;
-  donation_count: number;
-  total_donation: number;
-  feature_unlocks: string[];
+  student_id: string; display_name: string; student_number: number; first_login: boolean; account_status: string;
+  basic_job: string | null; job_world?: string | null; cash: number; savings: number; housing_name: string | null;
+  growth_stage: number; basic_job_tasks_completed: number; jobs_completed: number; first_salary_received: boolean;
+  first_saving_completed: boolean; saving_goal_reached: boolean; donation_count: number; total_donation: number;
+  feature_unlocks: string[]; competencies: Competency[]; postings: Posting[]; applications: Application[];
+  transactions: Transaction[]; bank_requests: BankRequest[]; bank_queue: BankQueue[]; badges: Badge[];
+  room_items: RoomItem[]; seats: Seat[]; community_goal: CommunityGoal;
+};
+type TeacherData = {
+  teacher_id: string; display_name: string; class_code: string; class_name: string;
+  active_week: { id?: string; week_number?: number; status?: string; starts_on?: string };
+  stats: { students: number; participating: number; completed: number; exceptions: number };
+  students: { id: string; name: string; number: number; job?: string; cash: number; savings: number; tasks: number; jobs_completed: number }[];
+  postings: { id: string; title: string; capacity: number; assigned: number; completed: number; status: string }[];
+  bank_requests: { id: string; student_name: string; request_type: string; amount: number; status: string }[];
+  exceptions: { id: string; type: string; title: string; detail: string; student_name?: string; created_at: string }[];
+  community_goal: { id?: string; title?: string; target_amount?: number; current_amount?: number; status?: string };
 };
 
-const viewFeature: Partial<Record<StudentView, string>> = { jobs: "job_board", wallet: "wallet", growth: "competencies", room: "my_room" };
-const featureCopy: Record<string, { title: string; condition: string }> = {
-  wallet: { title: "첫 월급과 지갑", condition: "첫 기본직업 업무를 완료하면 열립니다." },
-  bank: { title: "은행과 저축", condition: "첫 월급을 받으면 열립니다." },
-  housing: { title: "집과 자리", condition: "첫 저축을 완료하면 열립니다." },
-  job_board: { title: "새로운 직업의 세계", condition: "기본직업 업무를 2회 완료하면 열립니다." },
-  competencies: { title: "나의 여섯 가지 힘", condition: "서로 다른 업무를 4회 경험하면 열립니다." },
-  my_room: { title: "나만의 공간", condition: "저축 3,000꿈 목표를 달성하면 열립니다." },
+const nav: { id: StudentView; label: string; icon: string; feature?: string }[] = [
+  { id: "home", label: "오늘의 생활", icon: "⌂" }, { id: "jobs", label: "일자리 탐험", icon: "✦", feature: "job_board" },
+  { id: "wallet", label: "나의 경제", icon: "₩", feature: "wallet" }, { id: "growth", label: "진로 성장", icon: "◎", feature: "competencies" },
+  { id: "room", label: "마이룸", icon: "▣", feature: "my_room" },
+];
+const competencyNames: Record<string, string> = {
+  self_management: "자기관리 역량", knowledge_information: "지식정보처리 역량", creative_thinking: "창의적 사고 역량",
+  aesthetic_emotion: "심미적 감성 역량", collaborative_communication: "협력적 소통 역량", community: "공동체 역량",
 };
+const transactionNames: Record<string, string> = { salary: "기본직업 월급", job_reward: "공고 보수", rent: "주거비", saving: "저축", withdrawal: "출금", donation: "공동체기금 기부", seat_move: "자리 이동", adjustment: "잔액 조정" };
 const stageNames = ["첫걸음", "생활 시작", "직업 탐험", "성장 발견", "나의 세계", "함께하는 사회"];
 
-const jobs = [
-  {
-    id: 1,
-    icon: "✦",
-    tone: "violet",
-    world: "알리고 표현하는 일",
-    title: "학급 축제 포스터 만들기",
-    description: "친구들이 축제를 한눈에 이해할 수 있는 포스터를 함께 만들어요.",
-    people: "2명 모집",
-    time: "40분",
-    pay: 300,
-    skills: ["창의적 사고 +3", "심미적 감성 +3", "협력적 소통 +1"],
-  },
-  {
-    id: 2,
-    icon: "▦",
-    tone: "mint",
-    world: "정보와 돈을 다루는 일",
-    title: "우리 반 설문 결과 분석",
-    description: "좋아하는 쉬는 시간 활동을 조사하고 보기 좋은 그래프로 정리해요.",
-    people: "3명 모집",
-    time: "30분",
-    pay: 250,
-    skills: ["지식정보처리 +3", "창의적 사고 +1", "협력적 소통 +1"],
-  },
-  {
-    id: 3,
-    icon: "⌂",
-    tone: "orange",
-    world: "만들고 해결하는 일",
-    title: "학급문고 수납 방법 개선",
-    description: "책을 더 쉽게 찾고 정리할 수 있는 새로운 방법을 제안해요.",
-    people: "2명 모집",
-    time: "35분",
-    pay: 280,
-    skills: ["지식정보처리 +2", "창의적 사고 +2", "공동체 +2"],
-  },
-  {
-    id: 4,
-    icon: "◉",
-    tone: "blue",
-    world: "사람을 돕는 일",
-    title: "친구 복습 퀴즈 만들기",
-    description: "이번 주에 배운 내용을 떠올릴 수 있는 재미있는 퀴즈를 만들어요.",
-    people: "2명 모집",
-    time: "25분",
-    pay: 220,
-    skills: ["지식정보처리 +2", "협력적 소통 +3", "자기관리 +1"],
-  },
-];
-
-const competencyDefinitions = [
-  {
-    name: "자기관리 역량",
-    short: "자기관리",
-    value: 54,
-    color: "#d75d88",
-    icon: "◉",
-    description: "자아정체성과 자신감을 가지고 자신의 삶과 진로를 스스로 설계하며, 필요한 기초 능력과 자질을 갖추어 자기주도적으로 살아가는 역량",
-  },
-  {
-    name: "지식정보처리 역량",
-    short: "지식정보처리",
-    value: 61,
-    color: "#8b6cc7",
-    icon: "▦",
-    description: "문제를 합리적으로 해결하기 위해 다양한 영역의 지식과 정보를 깊이 이해하고 비판적으로 탐구하며 활용하는 역량",
-  },
-  {
-    name: "창의적 사고 역량",
-    short: "창의적 사고",
-    value: 65,
-    color: "#f08a4b",
-    icon: "✦",
-    description: "폭넓은 기초 지식을 바탕으로 여러 분야의 지식·기술·경험을 융합적으로 활용하여 새로운 것을 창출하는 역량",
-  },
-  {
-    name: "심미적 감성 역량",
-    short: "심미적 감성",
-    value: 58,
-    color: "#e06f8f",
-    icon: "♡",
-    description: "인간에 대한 공감적 이해와 문화적 감수성을 바탕으로 삶의 의미와 가치를 성찰하고 향유하는 역량",
-  },
-  {
-    name: "협력적 소통 역량",
-    short: "협력적 소통",
-    value: 73,
-    color: "#2a9d75",
-    icon: "↔",
-    description: "다른 사람의 관점을 존중하고 경청하며 자신의 생각과 감정을 효과적으로 표현해 공동의 목적을 구현하는 역량",
-  },
-  {
-    name: "공동체 역량",
-    short: "공동체",
-    value: 70,
-    color: "#3f7bd9",
-    icon: "◎",
-    description: "개방적·포용적 가치와 태도로 지역·국가·세계 공동체의 지속 가능한 발전에 적극적이고 책임감 있게 참여하는 역량",
-  },
-] as const;
-
-const skillRows = competencyDefinitions.map(({ short, value, color }) => [short, value, color] as const);
-
-const studentNav: { id: StudentView; label: string; icon: string }[] = [
-  { id: "home", label: "오늘의 생활", icon: "⌂" },
-  { id: "jobs", label: "일자리 탐험", icon: "✦" },
-  { id: "wallet", label: "나의 경제", icon: "₩" },
-  { id: "growth", label: "진로 성장", icon: "◎" },
-  { id: "room", label: "마이룸", icon: "▣" },
-];
-
-function Avatar({ small = false }: { small?: boolean }) {
-  return (
-    <div className={small ? "avatar avatar--small" : "avatar"} aria-label="은행원 캐릭터">
-      <span className="avatar__hair" />
-      <span className="avatar__face" />
-      <span className="avatar__body" />
-      <span className="avatar__tie" />
-      <span className="avatar__case">₩</span>
-    </div>
-  );
+function Avatar({ small = false, job = "" }: { small?: boolean; job?: string | null }) {
+  const prop = job?.includes("기자") ? "✎" : job?.includes("제작") || job?.includes("엔지니어") ? "⚒" : job?.includes("디자이너") ? "✦" : "₩";
+  return <div className={small ? "avatar avatar--small" : "avatar"} aria-label={`${job || "학생"} 캐릭터`}><span className="avatar__hair" /><span className="avatar__face" /><span className="avatar__body" /><span className="avatar__tie" /><span className="avatar__case">{prop}</span></div>;
 }
 
-function Brand() {
-  return (
-    <div className="brand">
-      <span className="brand__mark">F</span>
-      <span><strong>미래탐험대</strong><small>우리 반 진로생활</small></span>
-    </div>
-  );
-}
+function Brand() { return <div className="brand"><span className="brand__mark">F</span><span><strong>미래탐험대</strong><small>우리 반 진로생활</small></span></div>; }
 
-function LoginVoyage({ onLogin, onTeacherPreview }: { onLogin: (student: StudentData) => void; onTeacherPreview: () => void }) {
-  const [classCode, setClassCode] = useState("");
-  const [displayName, setDisplayName] = useState("");
-  const [pin, setPin] = useState("");
-  const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [voyaging, setVoyaging] = useState(false);
-
+function Login({ onStudent, onTeacher }: { onStudent: (student: StudentData) => void; onTeacher: (teacher: TeacherData) => void }) {
+  const [role, setRole] = useState<"student" | "teacher">("student");
+  const [classCode, setClassCode] = useState(""); const [displayName, setDisplayName] = useState(""); const [pin, setPin] = useState("");
+  const [error, setError] = useState(""); const [loading, setLoading] = useState(false);
   const submit = async (event: FormEvent) => {
-    event.preventDefault();
-    if (!/^\d{4}$/.test(pin)) { setError("PIN은 숫자 4자리로 입력해 주세요."); return; }
+    event.preventDefault(); if (!/^\d{4}$/.test(pin)) { setError("PIN은 숫자 4자리로 입력해 주세요."); return; }
     setLoading(true); setError("");
     try {
-      const response = await fetch("/api/student", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "login", classCode, displayName, pin }) });
+      const response = await fetch(`/api/${role}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "login", classCode, displayName, pin }) });
       const result = await response.json();
-      if (!response.ok || !result.ok) { setError(result.message ?? "로그인 정보를 다시 확인해 주세요."); setLoading(false); return; }
-      setVoyaging(true);
-      window.setTimeout(() => onLogin(result.student as StudentData), 950);
-    } catch { setError("지금은 항해를 시작할 수 없어요. 잠시 후 다시 시도해 주세요."); setLoading(false); }
+      if (!response.ok || !result.ok) { setError(result.message ?? "로그인 정보를 다시 확인해 주세요."); return; }
+      if (role === "student") onStudent(result.student as StudentData); else onTeacher(result.teacher as TeacherData);
+    } catch { setError("지금은 접속할 수 없어요. 잠시 후 다시 시도해 주세요."); } finally { setLoading(false); }
   };
-
-  return <main className={`voyage-login ${voyaging ? "is-voyaging" : ""}`}>
-    <div className="voyage-sky"><span className="cloud cloud-a" /><span className="cloud cloud-b" /><span className="sun-glow" /></div>
-    <div className="voyage-copy"><div className="voyage-brand"><span>F</span> FUTURE ODYSSEY</div><p>교실에서 시작하는 나의 미래 항해</p><h1>작은 배 한 척으로<br /><em>나의 가능성</em>을 만나러 가요.</h1><div className="route-dots"><i /><i /><i /><span>새로운 항로</span></div></div>
-    <div className="sea-layer sea-back" /><div className="sea-layer sea-front" />
-    <div className="little-boat" aria-hidden="true"><span className="boat-sail" /><span className="boat-mast" /><span className="boat-hull" /></div>
-    <section className="login-card" aria-label="학생 로그인">
-      <span className="login-compass">✦</span><small>WELCOME ABOARD</small><h2>나의 미래 항해 시작</h2><p>선생님께 받은 정보를 입력해 주세요.</p>
-      <form onSubmit={submit}>
-        <label>학급코드<input inputMode="numeric" value={classCode} onChange={(e) => setClassCode(e.target.value.slice(0, 12))} placeholder="선생님께 받은 코드" autoComplete="organization" /></label>
-        <label>이름<input value={displayName} onChange={(e) => setDisplayName(e.target.value.slice(0, 30))} placeholder="이름을 입력하세요" autoComplete="name" /></label>
-        <label>숫자 4자리 PIN<input type="password" inputMode="numeric" pattern="[0-9]{4}" maxLength={4} value={pin} onChange={(e) => setPin(e.target.value.replace(/\D/g, "").slice(0, 4))} placeholder="● ● ● ●" autoComplete="current-password" /></label>
-        {error && <div className="login-error" role="alert">! {error}</div>}
-        <button className="voyage-button" disabled={loading || voyaging}>{loading ? "확인하고 있어요…" : voyaging ? "출항합니다…" : "항해 시작"}<span>→</span></button>
-      </form>
-      <div className="login-help">계정 정보는 선생님에게 확인하세요.</div>
-      <button type="button" className="teacher-preview-link" onClick={onTeacherPreview}>교사 관리자 화면 미리보기</button>
-    </section>
-    <p className="voyage-footer">잔잔한 파도처럼 천천히, 나만의 속도로 성장해요.</p>
-  </main>;
+  return <main className="voyage-login"><div className="voyage-sky"><span className="cloud cloud-a" /><span className="cloud cloud-b" /><span className="sun-glow" /></div><div className="voyage-copy"><div className="voyage-brand"><span>F</span> FUTURE ODYSSEY</div><p>교실에서 시작하는 나의 미래 항해</p><h1>다양한 일을 경험하며<br /><em>나의 가능성</em>을 발견해요.</h1></div><div className="sea-layer sea-back" /><div className="sea-layer sea-front" /><div className="little-boat" aria-hidden="true"><span className="boat-sail" /><span className="boat-mast" /><span className="boat-hull" /></div><section className="login-card" aria-label="로그인"><span className="login-compass">✦</span><small>WELCOME ABOARD</small><h2>{role === "student" ? "나의 미래 항해 시작" : "학급 운영 시작"}</h2><div className="login-role-tabs" role="tablist"><button type="button" className={role === "student" ? "active" : ""} onClick={() => { setRole("student"); setError(""); }}>학생</button><button type="button" className={role === "teacher" ? "active" : ""} onClick={() => { setRole("teacher"); setError(""); }}>교사</button></div><form onSubmit={submit}><label>학급코드<input value={classCode} onChange={(e) => setClassCode(e.target.value.slice(0, 12))} placeholder="학급코드" /></label><label>{role === "student" ? "이름" : "교사 이름"}<input value={displayName} onChange={(e) => setDisplayName(e.target.value.slice(0, 30))} placeholder="이름을 입력하세요" /></label><label>숫자 4자리 PIN<input type="password" inputMode="numeric" maxLength={4} value={pin} onChange={(e) => setPin(e.target.value.replace(/\D/g, "").slice(0, 4))} placeholder="● ● ● ●" /></label>{error ? <div className="login-error" role="alert">! {error}</div> : null}<button className="voyage-button" disabled={loading}>{loading ? "확인하고 있어요…" : "항해 시작"}<span>→</span></button></form><div className="login-help">계정 정보는 담임 선생님에게 확인하세요.</div></section></main>;
 }
 
 function PinSetup({ student, onComplete }: { student: StudentData; onComplete: (student: StudentData) => void }) {
   const [pin, setPin] = useState(""); const [confirm, setConfirm] = useState(""); const [error, setError] = useState(""); const [loading, setLoading] = useState(false);
-  const submit = async (event: FormEvent) => {
-    event.preventDefault();
-    if (!/^\d{4}$/.test(pin)) { setError("숫자 4자리로 만들어 주세요."); return; }
-    if (pin !== confirm) { setError("두 PIN이 서로 달라요. 다시 확인해 주세요."); return; }
-    setLoading(true); setError("");
-    const response = await fetch("/api/student", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "change-pin", pin }) });
-    const result = await response.json(); setLoading(false);
-    if (!response.ok || !result.ok) { setError(result.message ?? "PIN을 바꾸지 못했어요."); return; }
-    onComplete(result.student as StudentData);
-  };
-  return <main className="pin-page"><section className="pin-card"><span className="pin-lock">⌾</span><small>첫 항해 준비</small><h1>{student.display_name}님만의 비밀번호를<br />만들어 주세요.</h1><p>앞으로 Future Odyssey에 들어올 때 사용할 PIN이에요.</p><form onSubmit={submit}><label>새 PIN<input type="password" inputMode="numeric" maxLength={4} value={pin} onChange={(e) => setPin(e.target.value.replace(/\D/g, ""))} placeholder="○ ○ ○ ○" /></label><label>PIN 확인<input type="password" inputMode="numeric" maxLength={4} value={confirm} onChange={(e) => setConfirm(e.target.value.replace(/\D/g, ""))} placeholder="○ ○ ○ ○" /></label>{error && <div className="login-error" role="alert">! {error}</div>}<button className="voyage-button" disabled={loading}>{loading ? "저장하고 있어요…" : "내 비밀번호로 설정하기"}</button></form><div className="pin-guide">🔒 친구에게 알려주지 마세요. 선생님도 지금 PIN을 볼 수 없어요.</div></section></main>;
+  const submit = async (event: FormEvent) => { event.preventDefault(); if (!/^\d{4}$/.test(pin) || pin !== confirm) { setError("같은 숫자 4자리를 두 번 입력해 주세요."); return; } setLoading(true); const response = await fetch("/api/student", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "change-pin", pin }) }); const result = await response.json(); setLoading(false); if (!result.ok) { setError(result.message ?? "PIN을 바꾸지 못했어요."); return; } onComplete(result.student as StudentData); };
+  return <main className="pin-page"><section className="pin-card"><span className="pin-lock">⌾</span><small>첫 항해 준비</small><h1>{student.display_name}님만의 PIN을<br />만들어 주세요.</h1><p>친구에게 알려주지 않는 숫자 4자리예요.</p><form onSubmit={submit}><label>새 PIN<input type="password" inputMode="numeric" maxLength={4} value={pin} onChange={(e) => setPin(e.target.value.replace(/\D/g, ""))} /></label><label>PIN 확인<input type="password" inputMode="numeric" maxLength={4} value={confirm} onChange={(e) => setConfirm(e.target.value.replace(/\D/g, ""))} /></label>{error ? <div className="login-error">{error}</div> : null}<button className="voyage-button" disabled={loading}>{loading ? "저장 중…" : "내 PIN으로 설정"}</button></form></section></main>;
 }
 
-function FirstOnboarding({ student, onStart }: { student: StudentData; onStart: () => void }) {
-  return <main className="onboarding-page"><div className="onboarding-route"><i /><i /><i /></div><section className="onboarding-card"><span className="eyebrow">WELCOME TO FUTURE ODYSSEY</span><h1>{student.display_name}님의 첫 항해를<br />환영합니다!</h1><p>처음에는 작은 배 한 척이면 충분해요.<br />첫 직업에서 하나씩 경험하며 새로운 항로를 만나 보세요.</p><div className="first-job-card"><Avatar /><div><small>나의 첫 직업</small><h2>{student.basic_job ?? "직업 배정 대기"}</h2><span>첫 번째 업무</span><strong>{student.basic_job === "기자" ? "우리 반의 좋은 소식 한 가지 찾기" : "기본직업 업무를 확인하기"}</strong></div></div><button className="voyage-button" onClick={onStart}>나의 미래여정 시작 <span>→</span></button></section></main>;
+function Sidebar({ student, active, onChange, onLogout }: { student: StudentData; active: StudentView; onChange: (view: StudentView) => void; onLogout: () => void }) {
+  return <aside className="sidebar"><Brand /><nav className="side-nav" aria-label="학생 메뉴">{nav.map((item) => { const locked = Boolean(item.feature && !student.feature_unlocks.includes(item.feature)); return <button key={item.id} className={`${active === item.id ? "active" : ""} ${locked ? "nav-locked" : ""}`} onClick={() => onChange(item.id)}><span>{locked ? "◌" : item.icon}</span><span className="nav-copy">{item.label}{locked ? <small>경험을 쌓으면 열려요</small> : null}</span></button>; })}</nav><div className="side-tip"><span>💡</span><strong>이번 주 생각</strong><p>시간이 빨리 간 일은 무엇이었나요?</p></div><div className="side-profile"><Avatar small job={student.basic_job} /><span><strong>{student.display_name}</strong><small>{student.basic_job ?? "직업 대기"} · {stageNames[Math.max(0, student.growth_stage - 1)]}</small></span><button onClick={onLogout} aria-label="로그아웃">↪</button></div></aside>;
 }
 
-function LockedFeature({ feature, student, onBack }: { feature: string; student: StudentData; onBack: () => void }) {
-  const copy = featureCopy[feature] ?? { title: "아직 만나지 않은 항로", condition: "조금 더 경험하면 열립니다." };
-  const current = feature === "job_board" ? student.basic_job_tasks_completed : feature === "my_room" ? student.savings : student.basic_job_tasks_completed;
-  const target = feature === "job_board" ? 2 : feature === "my_room" ? 3000 : 4;
-  return <main className="locked-page"><section className="locked-route-card"><div className="locked-compass">⌖</div><span className="eyebrow">아직 닿지 않은 항로</span><h1>{copy.title}</h1><p>{copy.condition}</p><div className="unlock-progress-copy"><span>현재 진행</span><strong>{current.toLocaleString()} / {target.toLocaleString()}</strong></div><div className="progress purple"><i style={{ width: `${Math.min(100, current / target * 100)}%` }} /></div><small>복잡한 점수 대신 실제로 해본 활동만 세어요.</small><button className="secondary-button" onClick={onBack}>오늘의 생활로 돌아가기</button></section></main>;
+function Topbar({ label, onLogout }: { label: string; onLogout?: () => void }) { return <header className="topbar"><div className="mobile-brand"><Brand /></div><div className="week-pill"><span /> {label}</div><div className="top-actions">{onLogout ? <button className="role-switch" onClick={onLogout}>로그아웃</button> : null}</div></header>; }
+
+function HomeView({ student, busy, act }: { student: StudentData; busy: boolean; act: (action: string, extra?: Record<string, unknown>) => Promise<void> }) {
+  const goal = student.community_goal ?? {};
+  return <><section className="welcome-row"><div><span className="eyebrow">오늘의 진로생활</span><h1>{student.display_name}님, 오늘은 어떤 일을<br /><em>경험해 볼까요?</em></h1><p>친구와 함께 실제 교실의 일을 해보며 나의 강점을 발견해요.</p></div></section><section className="profile-hero"><div className="profile-art"><Avatar job={student.basic_job} /></div><div className="profile-copy"><span className="job-chip">나의 기본직업</span><h2>{student.basic_job ?? "직업 배정 대기"}</h2><p>{student.job_world ?? "교실에서 맡은 역할을 하나씩 경험해요."}</p><div className="role-tasks"><span>기본업무 {student.basic_job_tasks_completed}회</span><span>공고 완료 {student.jobs_completed}회</span></div></div><div className="week-mission"><span>기본직업 기록</span><strong>실제 교실 업무를 마쳤나요?</strong><small>완료할 때마다 새로운 기능이 열립니다.</small><button className="apply-button" disabled={busy} onClick={() => act("complete-task")}>{busy ? "기록 중…" : "기본업무 완료 기록"}</button></div></section><section className="money-grid"><article className="money-card"><span className="round-icon purple">₩</span><div><p>사용 가능한 현금</p><strong>{student.cash.toLocaleString()}꿈</strong><small>거래는 모두 안전하게 기록돼요.</small></div></article><article className="money-card"><span className="round-icon green">▥</span><div><p>차곡차곡 저축</p><strong>{student.savings.toLocaleString()}꿈</strong><small>3,000꿈부터 마이룸이 열려요.</small></div></article><article className="money-card"><span className="round-icon orange">⌂</span><div><p>현재 자리</p><strong>{student.housing_name ?? "배정 대기"}</strong><small>자리마다 특징과 주거비가 달라요.</small></div></article></section>{student.postings.length ? <><section className="section-head"><div><span className="eyebrow">이번 주 일자리</span><h2>궁금한 일을 골라보세요</h2></div></section><div className="job-grid home-jobs">{student.postings.slice(0, 3).map((posting) => <CompactPosting key={posting.id} posting={posting} application={student.applications.find((a) => a.posting_id === posting.id)} busy={busy} act={act} />)}</div></> : <article className="panel empty-state"><strong>이번 주 공고를 준비하고 있어요.</strong><p>선생님이 이번 주를 시작하면 새로운 일이 열립니다.</p></article>}{goal.id ? <Community goal={goal} cash={student.cash} busy={busy} act={act} /> : null}</>;
 }
 
-function Sidebar({ active, onChange, student, onLogout }: { active: StudentView; onChange: (view: StudentView) => void; student: StudentData; onLogout: () => void }) {
-  const lockedViews = studentNav.filter((item) => viewFeature[item.id] && !student.feature_unlocks.includes(viewFeature[item.id]!)).slice(0, 2).map((item) => item.id);
-  const visibleItems = studentNav.filter((item) => !viewFeature[item.id] || student.feature_unlocks.includes(viewFeature[item.id]!) || lockedViews.includes(item.id));
-  return (
-    <aside className="sidebar">
-      <Brand />
-      <nav aria-label="학생 메뉴" className="side-nav">
-        {visibleItems.map((item) => {
-          const locked = Boolean(viewFeature[item.id] && !student.feature_unlocks.includes(viewFeature[item.id]!));
-          return <button key={item.id} title={locked ? featureCopy[viewFeature[item.id]!]?.condition : undefined} className={`${active === item.id ? "active" : ""} ${locked ? "nav-locked" : ""}`} onClick={() => onChange(item.id)}>
-            <span>{locked ? "◌" : item.icon}</span><span className="nav-copy">{item.label}{locked && <small>아직 잠겨 있어요</small>}</span>
-          </button>
-        })}
-      </nav>
-      <div className="side-tip">
-        <span>💡</span>
-        <strong>이번 주 생각</strong>
-        <p>시간이 빨리 간 일은?</p>
-      </div>
-      <div className="side-profile"><Avatar small /><span><strong>{student.display_name}</strong><small>{student.basic_job ?? "직업 대기"} · {stageNames[student.growth_stage - 1]}</small></span><button aria-label="로그아웃" title="로그아웃" onClick={onLogout}>↪</button></div>
-    </aside>
-  );
+function skillsText(rewards: Record<string, number>) { return Object.entries(rewards).map(([key, value]) => `${competencyNames[key] ?? key} +${value}`); }
+
+function CompactPosting({ posting, application, busy, act }: { posting: Posting; application?: Application; busy: boolean; act: (action: string, extra?: Record<string, unknown>) => Promise<void> }) {
+  return <article className="job-card"><div className="job-card__head"><span className="job-icon violet">✦</span><span className="world-label">{posting.world}</span></div><h3>{posting.title}</h3><p>{posting.description}</p><div className="job-meta"><span>{posting.assigned_count}/{posting.capacity}명</span><span>{posting.duration_minutes}분</span><strong>+{posting.reward}꿈</strong></div><div className="skill-tags">{skillsText(posting.competency_rewards).map((skill) => <span key={skill}>{skill}</span>)}</div><button className={`apply-button ${application ? "applied" : ""}`} disabled={busy || Boolean(application)} onClick={() => act("apply-job", { postingId: posting.id })}>{application ? application.status === "waitlisted" ? "대기 중" : "참여 확정 ✓" : "이 일 경험하기"}</button></article>;
 }
 
-function Topbar({ teacher, onRole }: { teacher: boolean; onRole?: () => void }) {
-  return (
-    <header className="topbar">
-      <div className="mobile-brand"><Brand /></div>
-      <div className="week-pill"><span /> 2학기 · 5주차</div>
-      <div className="top-actions">
-        {onRole && <button className="role-switch" onClick={onRole}>{teacher ? "로그인 화면으로" : "교사 화면 보기"}</button>}
-        <button className="icon-button" aria-label="알림">♢<i /></button>
-      </div>
-    </header>
-  );
+function JobsView({ student, busy, act }: { student: StudentData; busy: boolean; act: (action: string, extra?: Record<string, unknown>) => Promise<void> }) {
+  const [filter, setFilter] = useState("전체"); const worlds = ["전체", ...Array.from(new Set(student.postings.map((p) => p.world)))];
+  const [draft, setDraft] = useState<Record<string, { summary: string; resultUrl: string; fun: number; difficulty: number }>>({});
+  const visible = filter === "전체" ? student.postings : student.postings.filter((p) => p.world === filter);
+  const update = (id: string, value: Partial<{ summary: string; resultUrl: string; fun: number; difficulty: number }>) => setDraft((current) => {
+    const existing = current[id] ?? { summary: "", resultUrl: "", fun: 3, difficulty: 3 };
+    return { ...current, [id]: { ...existing, ...value } };
+  });
+  return <><section className="page-heading"><span className="eyebrow">일자리 탐험</span><h1>어떤 일을 해볼까요?</h1><p>기본직업과 달라도 괜찮아요. 완료하면 표시된 핵심역량이 자랍니다.</p></section><div className="filter-row">{worlds.map((world) => <button key={world} className={filter === world ? "active" : ""} onClick={() => setFilter(world)}>{world}</button>)}</div><div className="jobs-summary"><strong>열린 공고 {student.postings.length}개</strong><span>나의 지원 {student.applications.length}개</span><span>완료 {student.jobs_completed}개</span></div><div className="job-grid all-jobs">{visible.map((posting) => { const application = student.applications.find((a) => a.posting_id === posting.id); const form = draft[application?.id ?? ""] ?? { summary: "", resultUrl: "", fun: 3, difficulty: 3 }; return <article className="job-card job-card-live" key={posting.id}><div className="job-card__head"><span className="job-icon violet">✦</span><span className="world-label">{posting.world}</span></div><h3>{posting.title}</h3><p>{posting.description}</p><div className="job-meta"><span>{posting.assigned_count}/{posting.capacity}명</span><span>{posting.duration_minutes}분</span><strong>+{posting.reward}꿈</strong></div><div className="skill-tags">{skillsText(posting.competency_rewards).map((skill) => <span key={skill}>{skill}</span>)}</div>{!application ? <button className="apply-button" disabled={busy} onClick={() => act("apply-job", { postingId: posting.id })}>지원하기</button> : application.status === "completed" ? <div className="completion-done">✓ 완료 기록과 보상이 반영됐어요.</div> : application.status === "waitlisted" ? <div className="completion-wait">현재 대기 중이에요.</div> : <div className="completion-form"><label>무엇을 했나요?<textarea value={form.summary} onChange={(e) => update(application.id, { summary: e.target.value })} placeholder="내가 맡아 실제로 한 일을 적어요." /></label><label>결과물 링크 또는 사진 주소(선택)<input value={form.resultUrl} onChange={(e) => update(application.id, { resultUrl: e.target.value })} placeholder="선택 입력" /></label><div className="rating-row"><label>재미 <select value={form.fun} onChange={(e) => update(application.id, { fun: Number(e.target.value) })}>{[1,2,3,4,5].map((n) => <option key={n}>{n}</option>)}</select></label><label>어려움 <select value={form.difficulty} onChange={(e) => update(application.id, { difficulty: Number(e.target.value) })}>{[1,2,3,4,5].map((n) => <option key={n}>{n}</option>)}</select></label></div><button className="apply-button" disabled={busy || form.summary.trim().length < 5} onClick={() => act("complete-job", { applicationId: application.id, ...form })}>완료 제출</button></div>}</article>; })}</div></>;
 }
 
-function MoneyCard({ label, value, detail, icon, tone }: { label: string; value: string; detail: string; icon: string; tone: string }) {
-  return (
-    <article className="money-card">
-      <span className={`round-icon ${tone}`}>{icon}</span>
-      <div><p>{label}</p><strong>{value}</strong><small>{detail}</small></div>
-    </article>
-  );
+function Community({ goal, cash, busy, act }: { goal: CommunityGoal; cash: number; busy: boolean; act: (action: string, extra?: Record<string, unknown>) => Promise<void> }) {
+  const current = goal.current_amount ?? 0; const target = goal.target_amount ?? 1; const percent = Math.min(100, Math.round(current / target * 100));
+  return <article className="panel community-card"><div className="community-visual"><span>우리 반</span><strong>{goal.title}</strong><div className="ball">●</div></div><div className="community-copy"><span className="eyebrow">함께 만드는 공동체 목표</span><h2>{goal.title}</h2><p>{goal.description}</p><div className="fund-row"><span>현재 기금</span><strong>{current.toLocaleString()} <small>/ {target.toLocaleString()}꿈</small></strong></div><div className="progress"><i style={{ width: `${percent}%` }} /></div><div className="fund-row participation"><span>{goal.min_donations}회 이상 참여한 친구</span><strong>{goal.qualified_students ?? 0} / {goal.total_students ?? 0}명</strong></div><button className="donate-button" disabled={busy || cash < 100 || goal.status === "achieved"} onClick={() => act("donate", { goalId: goal.id, amount: 100 })}>{goal.status === "achieved" ? "목표 달성 ✓" : "100꿈 함께 보태기"}</button></div></article>;
 }
 
-function JobCard({ job, applied, onApply }: { job: (typeof jobs)[number]; applied: boolean; onApply: () => void }) {
-  return (
-    <article className="job-card">
-      <div className="job-card__head"><span className={`job-icon ${job.tone}`}>{job.icon}</span><span className="world-label">{job.world}</span><button aria-label="공고 저장">♡</button></div>
-      <h3>{job.title}</h3>
-      <p>{job.description}</p>
-      <div className="job-meta"><span>♙ {job.people}</span><span>◷ {job.time}</span><strong>+{job.pay.toLocaleString()} 꿈</strong></div>
-      <div className="skill-tags" aria-label="성장 역량">{job.skills.map((skill) => <span key={skill}>{skill}</span>)}</div>
-      <button className={applied ? "apply-button applied" : "apply-button"} onClick={onApply}>{applied ? "지원 완료 ✓" : "이 일 경험해 보기"}</button>
-    </article>
-  );
+function WalletView({ student, busy, act }: { student: StudentData; busy: boolean; act: (action: string, extra?: Record<string, unknown>) => Promise<void> }) {
+  const [amount, setAmount] = useState(100); const [type, setType] = useState("saving");
+  return <><section className="page-heading"><span className="eyebrow">나의 경제</span><h1>돈의 흐름을 직접 경험해요</h1><p>잔액은 학생이 직접 바꾸지 않고, 은행 확인과 안전한 기록을 거쳐 움직입니다.</p></section><div className="wallet-balance"><div><span>현금</span><strong>{student.cash.toLocaleString()} <small>꿈</small></strong><p>지금 사용할 수 있는 돈</p></div><div><span>저축</span><strong>{student.savings.toLocaleString()} <small>꿈</small></strong><p>유지할수록 마이룸 아이템 해금</p></div><div className="wallet-actions bank-request-form"><select value={type} onChange={(e) => setType(e.target.value)} aria-label="은행 신청 종류"><option value="saving">저축 신청</option><option value="withdrawal">출금 신청</option></select><select value={amount} onChange={(e) => setAmount(Number(e.target.value))} aria-label="신청 금액">{[100,200,300,500,1000].map((value) => <option key={value} value={value}>{value}꿈</option>)}</select><button disabled={busy} onClick={() => act("bank-request", { type, amount })}>은행에 신청</button></div></div><div className="dashboard-grid wallet-grid"><article className="panel"><div className="panel-title"><div><span className="eyebrow">거래 기록</span><h2>최근 돈의 흐름</h2></div></div><div className="transaction-list">{student.transactions.length ? student.transactions.map((tx) => { const delta = tx.cash_delta || tx.savings_delta; return <div key={tx.id}><span className={`timeline-icon ${delta >= 0 ? "green" : "orange"}`}>{delta >= 0 ? "↙" : "↗"}</span><p><strong>{transactionNames[tx.transaction_type] ?? tx.transaction_type}</strong><small>{new Date(tx.created_at).toLocaleDateString("ko-KR")} · 현금 {tx.cash_after.toLocaleString()}꿈 · 저축 {tx.savings_after.toLocaleString()}꿈</small></p><b className={delta >= 0 ? "plus" : ""}>{delta > 0 ? "+" : ""}{delta.toLocaleString()}꿈</b></div>; }) : <p className="empty-copy">아직 거래 기록이 없어요.</p>}</div></article><article className="panel"><div className="panel-title"><div><span className="eyebrow">은행 신청</span><h2>처리 상태</h2></div></div><div className="request-list">{student.bank_requests.length ? student.bank_requests.map((request) => <div key={request.id}><strong>{request.request_type === "saving" ? "저축" : "출금"} {request.amount.toLocaleString()}꿈</strong><span className={`status-pill ${request.status}`}>{request.status === "pending" ? "확인 대기" : request.status === "approved" ? "승인" : "반려"}</span></div>) : <p className="empty-copy">신청 내역이 없어요.</p>}</div></article></div>{student.bank_queue.length ? <article className="panel bank-queue"><div className="panel-title"><div><span className="eyebrow">은행원 업무</span><h2>확인이 필요한 신청</h2></div></div>{student.bank_queue.map((request) => <div className="review-row" key={request.id}><p><strong>{request.student_name}</strong><small>{request.request_type === "saving" ? "저축" : "출금"} · {request.amount.toLocaleString()}꿈</small></p><button disabled={busy} onClick={() => act("review-bank", { requestId: request.id, decision: "approve" })}>확인</button><button className="subtle" disabled={busy} onClick={() => act("review-bank", { requestId: request.id, decision: "reject" })}>반려</button></div>)}</article> : null}<article className="panel seat-panel"><div className="panel-title"><div><span className="eyebrow">자리 이동</span><h2>나에게 맞는 공간 찾기</h2></div></div><div className="seat-grid">{student.seats.map((seat) => <button key={seat.id} disabled={!seat.available || busy || seat.name === student.housing_name} onClick={() => act("request-seat", { seatId: seat.id })}><strong>{seat.name}</strong><span>{seat.type} · 주거비 {seat.rent}꿈</span><small>{seat.available ? `이동비 ${seat.move_cost}꿈` : "사용 중"}</small></button>)}</div></article>{student.community_goal?.id ? <Community goal={student.community_goal} cash={student.cash} busy={busy} act={act} /> : null}</>;
 }
 
-function RadarCard() {
-  return (
-    <article className="panel growth-card">
-      <div className="panel-title"><div><span className="eyebrow">나의 역량</span><h2>이만큼 자랐어요</h2></div><button>자세히 보기 →</button></div>
-      <div className="growth-body">
-        <div className="radar-wrap" aria-label="역량 육각형 그래프">
-          <div className="radar-grid grid-one" /><div className="radar-grid grid-two" /><div className="radar-grid grid-three" />
-          <div className="radar-shape" />
-          <span className="radar-label top">협력적 소통</span><span className="radar-label tr">창의적 사고</span><span className="radar-label br">심미적 감성</span>
-          <span className="radar-label bottom">공동체</span><span className="radar-label bl">자기관리</span><span className="radar-label tl">지식정보처리</span>
-        </div>
-        <div className="skill-list">
-          {skillRows.map(([label, value, color]) => <div className="skill-row" key={label}><span>{label}</span><div><i style={{ width: `${value}%`, background: color }} /></div><strong>{value}</strong></div>)}
-        </div>
-      </div>
-      <div className="growth-note"><span>↗</span><p><strong>협력적 소통 역량이 가장 많이 자랐어요!</strong><small>친구 인터뷰와 은행 상담에서 경청하고 설명한 경험 덕분이에요.</small></p></div>
-    </article>
-  );
+function GrowthView({ student }: { student: StudentData }) {
+  const max = Math.max(10, ...student.competencies.map((item) => item.xp));
+  const completed = student.applications.filter((app) => app.status === "completed");
+  return <><section className="page-heading"><span className="eyebrow">진로 성장</span><h1>직업 이름보다, 내가 해본 일을 모아요</h1><p>점수는 순위가 아니라 어떤 힘을 자주 사용했는지 보여주는 나만의 기록입니다.</p></section><div className="growth-layout"><article className="panel growth-card"><div className="panel-title"><div><span className="eyebrow">2022 개정 교육과정</span><h2>나의 여섯 가지 핵심역량</h2></div></div><div className="live-skill-list">{student.competencies.map((item) => <div className="live-skill" key={item.key}><div><strong>{item.name}</strong><span>{item.xp} 경험점</span></div><div className="progress"><i style={{ width: `${Math.round(item.xp / max * 100)}%`, background: item.color }} /></div></div>)}</div></article><article className="panel experience-card"><span className="eyebrow">직업 경험 기록</span><h2>이번 학기 {completed.length}번의 경험</h2><div className="experience-list">{completed.length ? completed.map((app) => <div key={app.id}><span>✓</span><p><strong>{app.title}</strong><small>재미 {app.fun_rating}/5 · 어려움 {app.difficulty_rating}/5</small></p></div>) : <p className="empty-copy">첫 공고를 완료하면 이곳에 경험이 쌓여요.</p>}</div></article></div><article className="panel"><div className="panel-title"><div><span className="eyebrow">나의 배지</span><h2>경험으로 얻은 표시</h2></div></div><div className="badge-collection">{student.badges.length ? student.badges.map((badge) => <div key={badge.key}><span>{badge.icon}</span><strong>{badge.name}</strong><small>{badge.description}</small></div>) : <p className="empty-copy">첫 경험 배지를 만나러 가볼까요?</p>}</div></article></>;
 }
 
-function CommunityCard({ donated, onDonate }: { donated: boolean; onDonate: () => void }) {
-  return (
-    <article className="panel community-card">
-      <div className="community-visual"><span>우리 반</span><strong>피구놀이</strong><div className="ball">●</div></div>
-      <div className="community-copy">
-        <span className="eyebrow">함께 만드는 공동체 목표</span><h2>우리 반 피구놀이를 열어요!</h2><p>금액과 참여 조건을 모두 채우면 금요일에 함께 즐길 수 있어요.</p>
-        <div className="fund-row"><span>현재 기금</span><strong>8,350 <small>/ 10,000 꿈</small></strong></div>
-        <div className="progress"><i style={{ width: "83.5%" }} /></div>
-        <div className="fund-row participation"><span>2회 이상 기부한 친구</span><strong>23 / 25명</strong></div>
-        <button className={donated ? "donate-button done" : "donate-button"} onClick={onDonate}>{donated ? "오늘의 기부 완료 ✓" : "100꿈 함께 보태기"}</button>
-      </div>
-    </article>
-  );
+function RoomView({ student, busy, act }: { student: StudentData; busy: boolean; act: (action: string, extra?: Record<string, unknown>) => Promise<void> }) {
+  const equipped = student.room_items.filter((item) => item.equipped); const next = student.room_items.filter((item) => !item.unlocked).sort((a,b) => a.required-b.required)[0];
+  return <><section className="page-heading room-heading"><div><span className="eyebrow">나의 공간</span><h1>저축을 지키며 취향을 표현해요</h1><p>물건을 사는 대신 저축 목표에 도달하면 아이템이 열립니다.</p></div><div className="room-level"><span>다음 해금</span><strong>{next ? `${next.name} · ${Math.max(0,next.required-student.savings).toLocaleString()}꿈 남음` : "모두 해금"}</strong></div></section><div className="room-layout"><div className="room-scene style-독서형"><div className="room-wall"><div className="window"><i /><span /></div><div className="poster">MY<br />DREAM</div><div className="shelf"><i /><i /><i /></div></div><div className="room-floor"><div className="rug" /><div className="desk"><span>✎</span></div><div className="chair" /><div className="plant">♣</div><div className="room-avatar"><Avatar job={student.basic_job} /></div></div><div className="room-label">{equipped.length ? equipped.map((item) => item.visual).join(" ") : "나의 기본 마이룸"}</div></div><aside className="panel room-controls live-room-controls"><span className="eyebrow">슬롯형 꾸미기</span><h2>해금 아이템</h2>{student.room_items.map((item) => <button key={item.key} disabled={!item.unlocked || busy} className={item.equipped ? "active" : ""} onClick={() => act("equip-room", { itemKey: item.key })}><i>{item.visual}</i><span><strong>{item.name}</strong><small>{item.unlocked ? `${item.slot} · ${item.style}` : `저축 ${item.required.toLocaleString()}꿈에 해금`}</small></span>{item.equipped ? <b>✓</b> : null}</button>)}</aside></div></>;
 }
 
-function StarterHome({ student, onCompleteTask, busy }: { student: StudentData; onCompleteTask: () => void; busy: boolean }) {
-  const completed = student.basic_job_tasks_completed;
-  return <>
-    <section className="welcome-row"><div><span className="eyebrow">{stageNames[student.growth_stage - 1]} · 첫 항해</span><h1>{student.display_name}님의 세계는 지금부터 <em>천천히</em> 넓어져요.</h1><p>오늘은 첫 직업과 첫 번째 업무에만 집중해 보세요.</p></div></section>
-    <section className="profile-hero starter-hero"><div className="profile-art"><div className="spark spark-a">✦</div><Avatar /></div><div className="profile-copy"><span className="job-chip">나의 첫 직업</span><h2>우리 반의 <em>{student.basic_job ?? "새로운 역할"}</em></h2><p>{student.basic_job === "기자" ? "우리 반의 좋은 소식을 발견하고 친구들에게 알기 쉽게 전하는 역할이에요." : "교실에서 맡은 첫 역할을 경험하며 나의 강점을 찾아가요."}</p><div className="role-tasks"><span>✓ 주변을 자세히 살펴보기</span><span>✓ 친구의 이야기를 잘 듣기</span></div></div><div className="week-mission"><span>첫 번째 업무</span><strong>{student.basic_job === "기자" ? "우리 반의 좋은 소식 한 가지 찾기" : "기본직업 업무 확인하기"}</strong><div className="mission-progress"><i style={{ width: completed > 0 ? "100%" : "8%" }} /></div><small>{completed > 0 ? "완료했어요! 첫 월급을 확인해 보세요." : "실제 교실 활동을 마치고 완료를 눌러요."}</small></div></section>
-    <section className="first-task-panel"><div className="first-task-route"><span className="route-start">⚑</span><i /><span className="route-lock">₩</span><i /><span className="route-lock">▥</span></div><div><span className="eyebrow">다음에 열릴 항로</span><h2>첫 업무를 마치면 지갑과 은행을 발견해요</h2><p>첫 월급 800꿈이 지급되고, 내가 번 돈을 확인하고 저축할 수 있게 돼요.</p><button className="apply-button" onClick={onCompleteTask} disabled={busy || completed > 0}>{busy ? "기록하고 있어요…" : completed > 0 ? "첫 업무 완료 ✓" : "첫 업무 완료하기"}</button></div></section>
-  </>;
-}
-
-function StudentHome({ student, applied, setApplied, donated, onDonate }: { student: StudentData; applied: number[]; setApplied: (id: number) => void; donated: boolean; onDonate: () => void }) {
-  return (
-    <>
-      <section className="welcome-row"><div><span className="eyebrow">{stageNames[student.growth_stage - 1]}</span><h1>{student.display_name}님, 오늘은 <em>어떤 일</em>을 해볼까요?</h1><p>이번 주에 궁금한 일 하나를 골라보세요.</p></div></section>
-      <section className="profile-hero">
-        <div className="profile-art"><div className="spark spark-a">✦</div><div className="spark spark-b">✦</div><Avatar /></div>
-        <div className="profile-copy"><span className="job-chip">나의 기본직업</span><h2>우리 반의 <em>{student.basic_job ?? "새로운 역할"}</em></h2><p>맡은 일을 하며 나의 강점을 발견해요.</p><div className="role-tasks"><span>✓ 기본 업무</span><span>✓ 친구와 협력</span><span>✓ 경험 기록</span></div><button className="text-button">직업 자세히 보기 →</button></div>
-        <div className="week-mission"><span>기본직업 업무 경험</span><strong>{student.basic_job_tasks_completed}번의 일을 해봤어요</strong><div className="mission-progress"><i style={{ width: `${Math.min(100, student.basic_job_tasks_completed / 4 * 100)}%` }} /></div><small>경험할수록 새로운 항로가 열려요.</small></div>
-      </section>
-      <section className="money-grid"><MoneyCard label="현금" value={`${student.cash.toLocaleString()} 꿈`} detail="사용 가능한 돈" icon="₩" tone="purple" />{student.feature_unlocks.includes("bank") && <MoneyCard label="저축" value={`${student.savings.toLocaleString()} 꿈`} detail={`마이룸까지 ${Math.max(0, 3000 - student.savings).toLocaleString()}꿈`} icon="▥" tone="green" />}{student.feature_unlocks.includes("housing") && <MoneyCard label="나의 자리" value={student.housing_name ?? "배정 대기"} detail="현재 생활 공간" icon="⌑" tone="orange" />}</section>
-      {student.feature_unlocks.includes("job_board") && <><section className="section-head"><div><span className="eyebrow">이번 주 일자리</span><h2>궁금한 일을 골라보세요</h2><p>기본직업과 달라도 괜찮아요.</p></div><button>공고 전체 보기 →</button></section><div className="job-grid home-jobs">{jobs.slice(0, 3).map((job) => <JobCard key={job.id} job={job} applied={applied.includes(job.id)} onApply={() => setApplied(job.id)} />)}</div></>}
-      <div className={`dashboard-grid ${student.feature_unlocks.includes("competencies") ? "" : "single-card"}`}>{student.feature_unlocks.includes("competencies") && <RadarCard />}<article className="panel savings-card"><div className="panel-title"><div><span className="eyebrow">저축 목표</span><h2>다음 마이룸 아이템</h2></div><span className="tiny-badge">독서형</span></div><div className="unlock-art"><div className="bookshelf"><span /><span /><span /><span /></div><div className="locked">🔒</div></div><h3>포근한 원목 책장</h3><p>저축 3,000꿈을 유지하면 해금돼요.</p><div className="fund-row"><span>{student.savings.toLocaleString()}꿈 모음</span><strong>{Math.min(100, Math.round(student.savings / 3000 * 100))}%</strong></div><div className="progress purple"><i style={{ width: `${Math.min(100, student.savings / 3000 * 100)}%` }} /></div><small className="remaining">{Math.max(0, 3000 - student.savings).toLocaleString()}꿈만 더 모으면 만날 수 있어요!</small><button className="secondary-button">저축하러 가기</button></article></div>
-      {student.feature_unlocks.includes("community_fund") && <CommunityCard donated={donated} onDonate={onDonate} />}
-      <section className="panel recent-panel"><div className="panel-title"><div><span className="eyebrow">나의 발자국</span><h2>최근 경험</h2></div><button>전체 보기 →</button></div><div className="timeline"><div><span className="timeline-icon violet">✎</span><p><strong>친구 인터뷰</strong><small>협력적 소통 +3 · 공동체 +1</small></p><b>어제</b></div><div><span className="timeline-icon green">₩</span><p><strong>저축 상담 2건</strong><small>자기관리 +1 · 협력적 소통 +1</small></p><b>3일 전</b></div><div><span className="timeline-icon orange">✦</span><p><strong>행사 이름표 디자인</strong><small>심미적 감성 +3 · 창의적 사고 +2</small></p><b>지난주</b></div></div></section>
-    </>
-  );
-}
-
-function JobsView({ applied, setApplied }: { applied: number[]; setApplied: (id: number) => void }) {
-  const [filter, setFilter] = useState("전체");
-  const filters = ["전체", "사람을 돕는 일", "만들고 해결하는 일", "정보와 돈", "알리고 표현하는 일"];
-  return <><section className="page-heading"><span className="eyebrow">일자리 탐험</span><h1>어떤 일을 해볼까요?</h1><p>궁금한 일을 고르세요. 완료하면 표시된 핵심역량이 자라요.</p></section><div className="filter-row">{filters.map((item) => <button key={item} onClick={() => setFilter(item)} className={filter === item ? "active" : ""}>{item}</button>)}</div><div className="jobs-summary"><strong>공고 4개</strong><span>지원 {applied.length}개</span><span>남은 자리 7명</span></div><div className="job-grid all-jobs">{jobs.map((job) => <JobCard key={job.id} job={job} applied={applied.includes(job.id)} onApply={() => setApplied(job.id)} />)}</div></>;
-}
-
-function WalletView({ student, donated, onDonate, onSave, busy }: { student: StudentData; donated: boolean; onDonate: () => void; onSave: () => void; busy: boolean }) {
-  const bankOpen = student.feature_unlocks.includes("bank");
-  const housingOpen = student.feature_unlocks.includes("housing");
-  return <><section className="page-heading"><span className="eyebrow">나의 경제</span><h1>돈이 어디에서 오고, 어디로 갈까요?</h1><p>월급을 받고, 생활비를 내고, 저축과 나눔을 직접 경험해요.</p></section><div className="wallet-balance"><div><span>사용할 수 있는 현금</span><strong>{student.cash.toLocaleString()} <small>꿈</small></strong><p>{housingOpen ? "이번 주 예상 월세 300꿈" : "첫 월급부터 차근차근 시작해요"}</p></div><div className={bankOpen ? "" : "soft-locked"}><span>차곡차곡 저축</span><strong>{bankOpen ? student.savings.toLocaleString() : "—"} <small>꿈</small></strong><p>{bankOpen ? "3,000꿈에 마이룸 해금" : "첫 월급을 받으면 은행이 열려요"}</p></div><div className="wallet-actions"><button onClick={onSave} disabled={!bankOpen || busy || student.cash < 100}>{busy ? "처리 중…" : "+ 100꿈 저축하기"}</button><button disabled>출금은 은행원 확인 후 가능</button></div></div><div className="dashboard-grid wallet-grid"><article className="panel"><div className="panel-title"><div><span className="eyebrow">거래 기록</span><h2>최근 흐름</h2></div></div><div className="transaction-list"><div><span className="timeline-icon green">↙</span><p><strong>기본직업 첫 월급</strong><small>기본 업무 완료 후 자동 지급</small></p><b className="plus">+800꿈</b></div>{student.first_saving_completed && <div><span className="timeline-icon violet">▥</span><p><strong>첫 저축</strong><small>나의 경제 경험이 한 칸 넓어졌어요</small></p><b>-100꿈</b></div>}{housingOpen && <div><span className="timeline-icon orange">⌂</span><p><strong>{student.housing_name ?? "나의 자리"}</strong><small>집과 자리 기능이 열렸어요</small></p><b>발견</b></div>}</div></article><article className="panel settlement-card"><span className="eyebrow">나의 다음 항로</span><h2>{student.savings >= 3000 ? "마이룸이 열렸어요!" : "저축 목표 3,000꿈"}</h2><div><span>현재 저축</span><strong>{student.savings.toLocaleString()}꿈</strong></div><div><span>남은 금액</span><strong>{Math.max(0, 3000 - student.savings).toLocaleString()}꿈</strong></div><div className="progress purple"><i style={{ width: `${Math.min(100, student.savings / 3000 * 100)}%` }} /></div><small>돈을 쓰는 대신 저축을 유지하면 나만의 공간이 열려요.</small></article></div>{student.feature_unlocks.includes("community_fund") && <CommunityCard donated={donated} onDonate={onDonate} />}</>;
-}
-
-function GrowthView() {
-  return <><section className="page-heading"><span className="eyebrow">진로 성장</span><h1>직업 이름보다, 내가 해본 일을 모아요</h1><p>좋아했던 일과 자주 사용한 핵심역량이 쌓이면 나만의 진로 지도가 완성돼요.</p></section><div className="growth-layout"><RadarCard /><article className="panel experience-card"><span className="eyebrow">나의 경험 지도</span><h2>이번 학기 13번의 경험</h2><div className="experience-orbits"><div className="orbit-center"><Avatar small /></div><span className="orbit one">금융 <b>7</b></span><span className="orbit two">소통 <b>3</b></span><span className="orbit three">디자인 <b>2</b></span><span className="orbit four">기획 <b>1</b></span></div><div className="badge-row"><span>🏦<small>금융 경험</small></span><span>🎙️<small>소통 발견</small></span><span>🧭<small>탐험가</small></span><span className="locked-badge">🔒<small>다음 배지</small></span></div></article></div><article className="panel reflection-card"><div><span className="eyebrow">나의 발견 노트</span><h2>나는 이런 순간이 좋았어요</h2></div><blockquote>“친구의 이야기를 잘 듣고 복잡한 내용을 쉽게 설명했을 때 뿌듯했어요.”</blockquote><div><strong>좋아한 활동</strong><span>친구 인터뷰</span><span>저축 상담</span><span>자료 정리</span></div></article><section className="competency-section"><div className="competency-heading"><div><span className="eyebrow">2022 개정 교육과정 핵심역량</span><h2>여섯 가지 힘을 골고루 발견해요</h2><p>점수는 서로 비교하는 순위가 아니라, 공고를 수행하며 어떤 힘을 사용했는지 보여주는 성장 기록이에요.</p></div><span>교육과정 기반</span></div><div className="competency-grid">{competencyDefinitions.map((item) => <article className="competency-card" key={item.name}><span className="competency-icon" style={{ color: item.color, background: `${item.color}18` }}>{item.icon}</span><div><h3>{item.name}</h3><p>{item.description}</p></div></article>)}</div></section></>;
-}
-
-function RoomView() {
-  const [style, setStyle] = useState("독서형");
-  return <><section className="page-heading room-heading"><div><span className="eyebrow">나의 공간</span><h1>취향을 담는 작은 방</h1><p>저축으로 해금한 아이템을 골라 나답게 꾸며보세요.</p></div><div className="room-level"><span>다음 해금</span><strong>책장까지 700꿈</strong></div></section><div className="room-layout"><div className={`room-scene style-${style}`}><div className="room-wall"><div className="window"><i /><span /></div><div className="poster">MY<br />DREAM</div><div className="shelf"><i /><i /><i /></div></div><div className="room-floor"><div className="rug" /><div className="desk"><span>✎</span></div><div className="chair" /><div className="plant">♣</div><div className="room-avatar"><Avatar /></div></div><div className="room-label">나의 {style} 마이룸</div></div><aside className="panel room-controls"><span className="eyebrow">스타일 고르기</span><h2>오늘의 분위기</h2>{["독서형", "자연형", "디지털형", "예술형", "메이커형"].map((item) => <button key={item} className={style === item ? "active" : ""} onClick={() => setStyle(item)}><i className={`swatch swatch-${item}`} /><span><strong>{item}</strong><small>{item === "독서형" ? "차분하고 포근하게" : item === "자연형" ? "초록빛으로 편안하게" : "나의 취향을 또렷하게"}</small></span>{style === item && <b>✓</b>}</button>)}</aside></div></>;
-}
-
-function TeacherDashboard({ onToast }: { onToast: (message: string) => void }) {
-  const [weekStarted, setWeekStarted] = useState(false);
-  const [settled, setSettled] = useState(false);
-  const startWeek = () => { setWeekStarted(true); onToast("5주차 공고 4개를 열었어요."); };
-  const settle = () => { setSettled(true); onToast("5주차 정산을 안전하게 완료했어요."); };
-  return <main className="teacher-shell"><section className="teacher-welcome"><div><span className="eyebrow">솔빛초 5학년 2반</span><h1>선생님, 이번 주도 <em>한눈에</em> 살펴보세요.</h1><p>잘 돌아가는 일은 시스템이 처리하고, 도움이 필요한 학생만 알려드릴게요.</p></div><div className="teacher-date"><span>이번 운영 주차</span><strong>2학기 · 5주차</strong><small>{weekStarted ? "진행 중 · 금요일 정산 예정" : "시작 전 · 공고를 준비했어요"}</small></div></section><section className="teacher-actions"><button className={weekStarted ? "done" : "primary"} onClick={startWeek}><span>▶</span><p><strong>{weekStarted ? "이번 주 진행 중" : "이번 주 시작"}</strong><small>{weekStarted ? "공고 4개가 열려 있어요" : "추천 공고를 열고 활동 시작"}</small></p></button><button className={settled ? "done" : ""} onClick={settle}><span>✓</span><p><strong>{settled ? "정산 완료" : "이번 주 정산"}</strong><small>급여·월세·보수 한 번에 처리</small></p></button><button onClick={() => onToast("공고 템플릿 12개를 확인할 수 있어요.")}><span>✦</span><p><strong>공고 관리</strong><small>템플릿 12개 · 열린 공고 4개</small></p></button><button className="alert-action" onClick={() => onToast("확인이 필요한 학생 3명을 표시했어요.")}><span>!</span><p><strong>예외 확인</strong><small>도움이 필요한 학생 3명</small></p><b>3</b></button></section><section className="teacher-stats"><article><span className="round-icon purple">♙</span><p>전체 학생<strong>25명</strong><small>모두 접속 완료</small></p></article><article><span className="round-icon green">↗</span><p>공고 참여율<strong>84%</strong><small>지난주보다 8% ↑</small></p></article><article><span className="round-icon orange">✓</span><p>완료된 업무<strong>18건</strong><small>진행 중 7건</small></p></article><article><span className="round-icon blue">♥</span><p>공동체기금<strong>8,350꿈</strong><small>목표의 83.5%</small></p></article></section><div className="teacher-grid"><article className="panel participation-panel"><div className="panel-title"><div><span className="eyebrow">이번 주 참여</span><h2>학생 활동 현황</h2></div><button>학생 전체 보기 →</button></div><div className="donut-row"><div className="donut"><span><strong>21</strong><small>/ 25명</small></span></div><div className="legend"><p><i className="legend-a" />공고 참여<strong>21명</strong></p><p><i className="legend-b" />아직 미참여<strong>4명</strong></p><p><i className="legend-c" />업무 완료<strong>18명</strong></p></div></div><div className="nudge"><span>💬</span><p><strong>4명의 학생이 아직 공고를 고르지 않았어요.</strong><small>부담 없는 공고를 함께 살펴보도록 안내해 보세요.</small></p><button>학생 확인</button></div></article><article className="panel exceptions"><div className="panel-title"><div><span className="eyebrow red">확인 필요</span><h2>딱 3가지만 봐주세요</h2></div><span className="count-badge">3</span></div><div className="exception-list"><div><span className="exception-icon red">!</span><p><strong>월세 납부가 어려워요</strong><small>박민준 · 예상 잔액 120꿈</small></p><button>확인</button></div><div><span className="exception-icon orange">◷</span><p><strong>2주 연속 공고 미참여</strong><small>이서윤 · 마지막 참여 3주차</small></p><button>확인</button></div><div><span className="exception-icon violet">⇄</span><p><strong>자리 이동 신청이 겹쳤어요</strong><small>협업형 C-2 · 신청 학생 2명</small></p><button>확인</button></div></div><button className="secondary-button full">모든 예외 자세히 보기</button></article></div><div className="teacher-grid lower"><article className="panel week-board"><div className="panel-title"><div><span className="eyebrow">5주차 공고</span><h2>일자리 진행 상황</h2></div><button>공고 관리 →</button></div>{jobs.slice(0, 3).map((job, index) => <div className="teacher-job" key={job.id}><span className={`job-icon ${job.tone}`}>{job.icon}</span><p><strong>{job.title}</strong><small>{["2명 선정 · 1명 완료", "3명 선정 · 3명 진행 중", "2명 선정 · 2명 완료"][index]}</small></p><div className="mini-progress"><i style={{ width: ["50%", "35%", "100%"][index] }} /></div><b>{["1/2", "0/3", "2/2"][index]}</b></div>)}</article><article className="panel fund-teacher"><div><span className="eyebrow">공동체 목표</span><h2>피구놀이까지 거의 다 왔어요</h2><p>기금은 충분하지만 2명의 학생이 한 번 더 참여하면 목표가 열려요.</p></div><div className="goal-ring"><span><strong>84%</strong><small>8,350꿈</small></span></div><div className="fund-checks"><p className="complete">✓ 금액 조건 <strong>8,350 / 8,000</strong></p><p>○ 참여 조건 <strong>23 / 25명</strong></p></div><button onClick={() => onToast("공동체 목표 안내를 학생 화면에 보냈어요.")}>학생에게 목표 다시 알리기</button></article></div></main>;
+function TeacherDashboard({ teacher, busy, act, logout }: { teacher: TeacherData; busy: boolean; act: (action: string, extra?: Record<string, unknown>) => Promise<void>; logout: () => void }) {
+  const total = Math.max(1, teacher.stats.students); const participation = Math.round(teacher.stats.participating / total * 100); const goal = teacher.community_goal;
+  return <div className="app teacher-mode"><div className="main-column teacher-column"><Topbar label={`${teacher.class_name} · 교사 관리`} onLogout={logout} /><main className="teacher-shell"><section className="teacher-welcome"><div><span className="eyebrow">학급코드 {teacher.class_code}</span><h1>{teacher.display_name}님, 필요한 것만<br /><em>한눈에</em> 살펴보세요.</h1><p>정상적인 일은 자동으로 처리하고 도움이 필요한 상황을 모아 보여드립니다.</p></div><div className="teacher-date"><span>현재 운영</span><strong>{teacher.active_week.week_number ? `${teacher.active_week.week_number}주차` : "시작 전"}</strong><small>{teacher.active_week.status === "active" ? "진행 중" : teacher.active_week.status === "settled" ? "정산 완료" : "공고 준비"}</small></div></section><section className="teacher-actions"><button className="primary" disabled={busy || teacher.active_week.status === "active"} onClick={() => act("start-week")}><span>▶</span><p><strong>이번 주 시작</strong><small>추천 공고 4개 자동 열기</small></p></button><button disabled={busy || teacher.active_week.status !== "active"} onClick={() => act("settle-week")}><span>✓</span><p><strong>이번 주 정산</strong><small>급여·월세·기록 한 번에</small></p></button><button onClick={() => document.getElementById("teacher-postings")?.scrollIntoView({ behavior: "smooth" })}><span>✦</span><p><strong>공고 현황</strong><small>{teacher.postings.length}개 공고 확인</small></p></button><button className="alert-action" onClick={() => document.getElementById("teacher-exceptions")?.scrollIntoView({ behavior: "smooth" })}><span>!</span><p><strong>예외 확인</strong><small>{teacher.stats.exceptions}건 확인 필요</small></p><b>{teacher.stats.exceptions}</b></button></section><section className="teacher-stats"><article><span className="round-icon purple">♙</span><p>전체 학생<strong>{teacher.stats.students}명</strong><small>현재 학급 계정</small></p></article><article><span className="round-icon green">↗</span><p>공고 참여율<strong>{participation}%</strong><small>{teacher.stats.participating}명 참여</small></p></article><article><span className="round-icon orange">✓</span><p>완료 업무<strong>{teacher.stats.completed}건</strong><small>역량 자동 반영</small></p></article><article><span className="round-icon blue">♥</span><p>공동체기금<strong>{(goal.current_amount ?? 0).toLocaleString()}꿈</strong><small>목표 {(goal.target_amount ?? 0).toLocaleString()}꿈</small></p></article></section><div className="teacher-grid"><article className="panel" id="teacher-postings"><div className="panel-title"><div><span className="eyebrow">이번 주 공고</span><h2>진행 상황</h2></div></div>{teacher.postings.length ? teacher.postings.map((posting) => <div className="teacher-job" key={posting.id}><span className="job-icon violet">✦</span><p><strong>{posting.title}</strong><small>{posting.assigned}명 참여 · {posting.completed}명 완료</small></p><div className="mini-progress"><i style={{ width: `${posting.capacity ? Math.round(posting.completed/posting.capacity*100) : 0}%` }} /></div><b>{posting.completed}/{posting.capacity}</b></div>) : <p className="empty-copy">이번 주 시작을 누르면 공고가 열립니다.</p>}</article><article className="panel exceptions" id="teacher-exceptions"><div className="panel-title"><div><span className="eyebrow red">확인 필요</span><h2>예외 상황</h2></div><span className="count-badge">{teacher.exceptions.length}</span></div><div className="exception-list">{teacher.exceptions.length ? teacher.exceptions.map((exception) => <div key={exception.id}><span className="exception-icon red">!</span><p><strong>{exception.title}</strong><small>{exception.student_name ? `${exception.student_name} · ` : ""}{exception.detail}</small></p></div>) : <p className="empty-copy">지금은 확인할 예외가 없습니다.</p>}</div></article></div>{teacher.bank_requests.length ? <article className="panel bank-queue"><div className="panel-title"><div><span className="eyebrow">은행 예외 승인</span><h2>처리 대기</h2></div></div>{teacher.bank_requests.map((request) => <div className="review-row" key={request.id}><p><strong>{request.student_name}</strong><small>{request.request_type === "saving" ? "저축" : "출금"} {request.amount.toLocaleString()}꿈</small></p><button disabled={busy} onClick={() => act("review-bank", { requestId: request.id, decision: "approve" })}>승인</button><button className="subtle" disabled={busy} onClick={() => act("review-bank", { requestId: request.id, decision: "reject" })}>반려</button></div>)}</article> : null}<article className="panel student-overview"><div className="panel-title"><div><span className="eyebrow">학생 현황</span><h2>학급 전체 보기</h2></div></div><div className="student-table"><div className="student-table-head"><span>학생</span><span>기본직업</span><span>현금</span><span>저축</span><span>공고 완료</span></div>{teacher.students.map((student) => <div key={student.id}><strong>{student.number}. {student.name}</strong><span>{student.job ?? "배정 대기"}</span><span>{student.cash.toLocaleString()}꿈</span><span>{student.savings.toLocaleString()}꿈</span><span>{student.jobs_completed}건</span></div>)}</div></article></main></div></div>;
 }
 
 export default function Home() {
-  const [teacherPreview, setTeacherPreview] = useState(false);
-  const [student, setStudent] = useState<StudentData | null>(null);
-  const [checkingSession, setCheckingSession] = useState(true);
-  const [showOnboarding, setShowOnboarding] = useState(false);
-  const [lockedFeature, setLockedFeature] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [active, setActive] = useState<StudentView>("home");
-  const [applied, setApplied] = useState<number[]>([]);
-  const [donated, setDonated] = useState(false);
-  const [toast, setToast] = useState("");
-  const title = useMemo(() => studentNav.find((item) => item.id === active)?.label, [active]);
-  const notify = (message: string) => { setToast(message); window.setTimeout(() => setToast(""), 2800); };
-  const apply = (id: number) => { if (!applied.includes(id)) { setApplied([...applied, id]); notify("지원했어요! 실제 교실 활동에서 만나요."); } };
-  const donate = () => { if (!donated) { setDonated(true); notify("공동체기금에 100꿈을 보탰어요. 고마워요!"); } };
-
-  useEffect(() => {
-    fetch("/api/student", { cache: "no-store" }).then(async (response) => {
-      if (!response.ok) return;
-      const result = await response.json();
-      if (result.ok) setStudent(result.student as StudentData);
-    }).finally(() => setCheckingSession(false));
-  }, []);
-
-  const postAction = async (action: string, extra: Record<string, unknown> = {}) => {
-    setBusy(true);
-    try {
-      const response = await fetch("/api/student", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action, ...extra }) });
-      const result = await response.json();
-      if (!response.ok || !result.ok) { notify(result.message ?? "처리하지 못했어요."); return null; }
-      if (result.student) setStudent(result.student as StudentData);
-      return result.student as StudentData | undefined;
-    } finally { setBusy(false); }
-  };
-  const completeTask = async () => {
-    const before = new Set(student?.feature_unlocks ?? []); const updated = await postAction("complete-task");
-    if (updated) notify(!before.has("wallet") && updated.feature_unlocks.includes("wallet") ? "새로운 항로 발견! 첫 월급과 지갑이 열렸어요." : "기본직업 업무를 기록했어요.");
-  };
-  const saveMoney = async () => {
-    const before = new Set(student?.feature_unlocks ?? []); const updated = await postAction("save", { amount: 100 });
-    if (updated) notify(!before.has("housing") && updated.feature_unlocks.includes("housing") ? "새로운 항로 발견! 집과 자리 기능이 열렸어요." : "100꿈을 안전하게 저축했어요.");
-  };
-  const logout = async () => { await postAction("logout"); setStudent(null); setTeacherPreview(false); setActive("home"); setLockedFeature(""); };
-  const changeView = (view: StudentView) => {
-    if (!student) return;
-    const required = viewFeature[view];
-    if (required && !student.feature_unlocks.includes(required)) { setLockedFeature(required); return; }
-    setLockedFeature(""); setActive(view);
-  };
-
-  if (checkingSession) return <main className="session-loading"><Brand /><div className="loading-wave"><i /><i /><i /></div><p>나의 항해 기록을 불러오고 있어요…</p></main>;
-  if (teacherPreview) return <div className="app teacher-mode"><div className="main-column"><Topbar teacher onRole={() => setTeacherPreview(false)} /><TeacherDashboard onToast={notify} /></div>{toast && <div className="toast" role="status"><span>✓</span>{toast}</div>}</div>;
-  if (!student) return <LoginVoyage onLogin={setStudent} onTeacherPreview={() => setTeacherPreview(true)} />;
-  if (student.first_login) return <PinSetup student={student} onComplete={(updated) => { setStudent(updated); setShowOnboarding(true); }} />;
-  if (showOnboarding) return <FirstOnboarding student={student} onStart={() => setShowOnboarding(false)} />;
-
-  const lockedViews = studentNav.filter((item) => viewFeature[item.id] && !student.feature_unlocks.includes(viewFeature[item.id]!)).slice(0, 2).map((item) => item.id);
-  const mobileItems = studentNav.filter((item) => !viewFeature[item.id] || student.feature_unlocks.includes(viewFeature[item.id]!) || lockedViews.includes(item.id));
-  return (
-    <div className="app">
-      <Sidebar active={active} onChange={changeView} student={student} onLogout={logout} />
-      <div className="main-column">
-        <Topbar teacher={false} />
-        <main className="content" aria-label={title}>{lockedFeature ? <LockedFeature feature={lockedFeature} student={student} onBack={() => { setLockedFeature(""); setActive("home"); }} /> : <>{active === "home" && (student.feature_unlocks.includes("wallet") ? <StudentHome student={student} applied={applied} setApplied={apply} donated={donated} onDonate={donate} /> : <StarterHome student={student} onCompleteTask={completeTask} busy={busy} />)}{active === "jobs" && <JobsView applied={applied} setApplied={apply} />}{active === "wallet" && <WalletView student={student} donated={donated} onDonate={donate} onSave={saveMoney} busy={busy} />}{active === "growth" && <GrowthView />}{active === "room" && <RoomView />}</>}</main>
-        <nav className="mobile-nav" aria-label="모바일 학생 메뉴">{mobileItems.map((item) => { const locked = Boolean(viewFeature[item.id] && !student.feature_unlocks.includes(viewFeature[item.id]!)); return <button key={item.id} className={`${active === item.id ? "active" : ""} ${locked ? "nav-locked" : ""}`} onClick={() => changeView(item.id)}><span>{locked ? "◌" : item.icon}</span>{item.label.split(" ")[0]}</button> })}</nav>
-      </div>
-      {toast && <div className="toast" role="status"><span>✓</span>{toast}</div>}
-    </div>
-  );
+  const [student, setStudent] = useState<StudentData | null>(null); const [teacher, setTeacher] = useState<TeacherData | null>(null);
+  const [checking, setChecking] = useState(true); const [busy, setBusy] = useState(false); const [active, setActive] = useState<StudentView>("home"); const [toast, setToast] = useState("");
+  const notify = (message: string) => { setToast(message); window.setTimeout(() => setToast(""), 3200); };
+  useEffect(() => { Promise.all([fetch("/api/student", { cache: "no-store" }), fetch("/api/teacher", { cache: "no-store" })]).then(async ([studentResponse, teacherResponse]) => { if (studentResponse.ok) { const data = await studentResponse.json(); if (data.ok) setStudent(data.student); } else if (teacherResponse.ok) { const data = await teacherResponse.json(); if (data.ok) setTeacher(data.teacher); } }).finally(() => setChecking(false)); }, []);
+  const studentAct = async (action: string, extra: Record<string, unknown> = {}) => { setBusy(true); try { const response = await fetch("/api/student", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action, ...extra }) }); const result = await response.json(); if (!response.ok || !result.ok) { notify(result.message ?? "처리하지 못했어요."); return; } if (result.student) setStudent(result.student); notify(result.message ?? (action === "complete-task" ? "기본업무를 기록했어요." : "안전하게 반영했어요.")); } finally { setBusy(false); } };
+  const teacherAct = async (action: string, extra: Record<string, unknown> = {}) => { setBusy(true); try { const response = await fetch("/api/teacher", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action, ...extra }) }); const result = await response.json(); if (!response.ok || !result.ok) { notify(result.message ?? "처리하지 못했어요."); return; } if (result.teacher) setTeacher(result.teacher); notify(result.message ?? "학급 운영에 반영했어요."); } finally { setBusy(false); } };
+  const logoutStudent = async () => { await fetch("/api/student", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "logout" }) }); setStudent(null); setActive("home"); };
+  const logoutTeacher = async () => { await fetch("/api/teacher", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "logout" }) }); setTeacher(null); };
+  const title = useMemo(() => nav.find((item) => item.id === active)?.label ?? "미래탐험대", [active]);
+  if (checking) return <main className="session-loading"><Brand /><div className="loading-wave"><i /><i /><i /></div><p>학급 기록을 불러오고 있어요…</p></main>;
+  if (teacher) return <TeacherDashboard teacher={teacher} busy={busy} act={teacherAct} logout={logoutTeacher} />;
+  if (!student) return <Login onStudent={setStudent} onTeacher={setTeacher} />;
+  if (student.first_login) return <PinSetup student={student} onComplete={setStudent} />;
+  const changeView = (view: StudentView) => { const item = nav.find((entry) => entry.id === view); if (item?.feature && !student.feature_unlocks.includes(item.feature)) { notify("아직 잠긴 항로예요. 기본직업과 공고 경험을 조금 더 쌓아보세요."); return; } setActive(view); };
+  return <div className="app"><Sidebar student={student} active={active} onChange={changeView} onLogout={logoutStudent} /><div className="main-column"><Topbar label={`${student.basic_job ?? "직업 탐험"} · ${title}`} /><main className="content">{active === "home" ? <HomeView student={student} busy={busy} act={studentAct} /> : active === "jobs" ? <JobsView student={student} busy={busy} act={studentAct} /> : active === "wallet" ? <WalletView student={student} busy={busy} act={studentAct} /> : active === "growth" ? <GrowthView student={student} /> : <RoomView student={student} busy={busy} act={studentAct} />}</main><nav className="mobile-nav" aria-label="모바일 학생 메뉴">{nav.map((item) => <button key={item.id} className={active === item.id ? "active" : ""} onClick={() => changeView(item.id)}><span>{item.icon}</span>{item.label.split(" ")[0]}</button>)}</nav></div>{toast ? <div className="toast" role="status"><span>✓</span>{toast}</div> : null}</div>;
 }

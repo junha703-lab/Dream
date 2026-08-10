@@ -62,6 +62,41 @@ export async function POST(request: Request) {
       const result = await callSupabaseRpc<RpcResult>("fo_student_save", { p_session_token: token, p_amount: Number(body.amount ?? 0) });
       return json(result, result.ok ? 200 : 400);
     }
+    if (action === "apply-job") {
+      const result = await callSupabaseRpc<RpcResult>("fo_student_apply", { p_session_token: token, p_posting_id: String(body.postingId ?? "") });
+      return json(result, result.ok ? 200 : 400);
+    }
+    if (action === "complete-job") {
+      const result = await callSupabaseRpc<RpcResult>("fo_student_complete_job", {
+        p_session_token: token,
+        p_application_id: String(body.applicationId ?? ""),
+        p_summary: String(body.summary ?? ""),
+        p_result_url: String(body.resultUrl ?? ""),
+        p_fun: Number(body.fun ?? 0),
+        p_difficulty: Number(body.difficulty ?? 0),
+      });
+      return json(result, result.ok ? 200 : 400);
+    }
+    if (action === "bank-request") {
+      const result = await callSupabaseRpc<RpcResult>("fo_student_bank_request", { p_session_token: token, p_type: String(body.type ?? ""), p_amount: Number(body.amount ?? 0) });
+      return json(result, result.ok ? 200 : 400);
+    }
+    if (action === "review-bank") {
+      const result = await callSupabaseRpc<RpcResult>("fo_student_review_bank", { p_session_token: token, p_request_id: String(body.requestId ?? ""), p_decision: String(body.decision ?? "") });
+      return json(result, result.ok ? 200 : 400);
+    }
+    if (action === "donate") {
+      const result = await callSupabaseRpc<RpcResult>("fo_student_donate", { p_session_token: token, p_goal_id: String(body.goalId ?? ""), p_amount: Number(body.amount ?? 0) });
+      return json(result, result.ok ? 200 : 400);
+    }
+    if (action === "equip-room") {
+      const result = await callSupabaseRpc<RpcResult>("fo_student_equip_room", { p_session_token: token, p_item_key: String(body.itemKey ?? "") });
+      return json(result, result.ok ? 200 : 400);
+    }
+    if (action === "request-seat") {
+      const result = await callSupabaseRpc<RpcResult>("fo_student_request_seat", { p_session_token: token, p_seat_id: String(body.seatId ?? "") });
+      return json(result, result.ok ? 200 : 400);
+    }
     if (action === "logout") {
       await callSupabaseRpc<RpcResult>("fo_student_logout", { p_session_token: token });
       return json({ ok: true }, 200, clearSessionCookie(request));

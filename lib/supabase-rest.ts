@@ -2,6 +2,7 @@ const SUPABASE_URL = process.env.SUPABASE_URL ?? "https://okbrapkebgyieyvuxamb.s
 const SUPABASE_PUBLISHABLE_KEY = process.env.SUPABASE_PUBLISHABLE_KEY ?? "sb_publishable_dqiMOBo-trOR-f44ZDxYDg_fdibKmDo";
 
 export const STUDENT_SESSION_COOKIE = "fo_student_session";
+export const TEACHER_SESSION_COOKIE = "fo_teacher_session";
 
 export async function callSupabaseRpc<T>(name: string, params: Record<string, unknown>): Promise<T> {
   const response = await fetch(`${SUPABASE_URL}/rest/v1/rpc/${name}`, {
@@ -30,12 +31,12 @@ export function readCookie(request: Request, name: string): string | null {
   return null;
 }
 
-export function sessionCookie(token: string, request: Request): string {
+export function sessionCookie(token: string, request: Request, name = STUDENT_SESSION_COOKIE): string {
   const secure = new URL(request.url).protocol === "https:" ? "; Secure" : "";
-  return `${STUDENT_SESSION_COOKIE}=${encodeURIComponent(token)}; HttpOnly; SameSite=Strict; Path=/; Max-Age=28800${secure}`;
+  return `${name}=${encodeURIComponent(token)}; HttpOnly; SameSite=Strict; Path=/; Max-Age=28800${secure}`;
 }
 
-export function clearSessionCookie(request: Request): string {
+export function clearSessionCookie(request: Request, name = STUDENT_SESSION_COOKIE): string {
   const secure = new URL(request.url).protocol === "https:" ? "; Secure" : "";
-  return `${STUDENT_SESSION_COOKIE}=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0${secure}`;
+  return `${name}=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0${secure}`;
 }

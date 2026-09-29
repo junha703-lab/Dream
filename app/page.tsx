@@ -63,7 +63,7 @@ const transactionNames: Record<string, string> = { salary: "기본직업 월급"
 const stageNames = ["첫걸음", "생활 시작", "직업 탐험", "성장 발견", "나의 세계", "함께하는 사회"];
 
 function Avatar({ small = false, job = "", custom, badge }: { small?: boolean; job?: string | null; custom?: StudentData["avatar"]; badge?: Badge }) {
-  const prop = job?.includes("기자") ? "✎" : job?.includes("제작") || job?.includes("엔지니어") ? "⚒" : job?.includes("디자이너") ? "✦" : "₩";
+  const prop = job?.includes("사서") ? "📚" : job?.includes("기자") ? "✎" : job?.includes("제작") || job?.includes("엔지니어") ? "⚒" : job?.includes("디자이너") ? "✦" : "₩";
   return <div className={`${small ? "avatar avatar--small" : "avatar"} avatar-bg-${custom?.background ?? "violet"} hair-${custom?.hair ?? "short"}`} aria-label={`${job || "학생"} 캐릭터`}><span className="avatar__sparkle sparkle-left">✦</span><span className="avatar__sparkle sparkle-right">♡</span><span className="avatar__ear avatar__ear--left" /><span className="avatar__ear avatar__ear--right" /><span className="avatar__hair" /><span className="avatar__face"><i className="avatar__cheek avatar__cheek--left" /><i className="avatar__cheek avatar__cheek--right" /></span><span className="avatar__body" /><span className="avatar__collar">♡</span><span className="avatar__shoe avatar__shoe--left" /><span className="avatar__shoe avatar__shoe--right" /><span className="avatar__case">{prop}</span>{badge ? <span className="avatar__badge" title={badge.name}>{badge.icon}</span> : null}</div>;
 }
 

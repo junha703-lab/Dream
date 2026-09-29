@@ -54,6 +54,10 @@ export async function POST(request: Request) {
       const result = await callSupabaseRpc<RpcResult>("fo_student_change_pin", { p_session_token: token, p_new_pin: String(body.pin ?? "") });
       return json(result, result.ok ? 200 : 400);
     }
+    if (action === "choose-job") {
+      const result = await callSupabaseRpc<RpcResult>("fo_student_choose_job", { p_session_token: token, p_job_code: String(body.jobCode ?? "") });
+      return json(result, result.ok ? 200 : 400);
+    }
     if (action === "complete-task") {
       const result = await callSupabaseRpc<RpcResult>("fo_complete_basic_task", { p_session_token: token });
       return json(result, result.ok ? 200 : 400);

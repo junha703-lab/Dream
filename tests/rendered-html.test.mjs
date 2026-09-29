@@ -132,3 +132,21 @@ test("keeps locked job postings hidden and connects evidence review end to end",
   assert.match(migration, /cw\.class_id=cid/);
   assert.match(migration, /revoke all on function private\.student_context/);
 });
+
+test("starts students locked and lets them choose a described classroom job", async () => {
+  const [page, studentApi, migration] = await Promise.all([
+    readFile(new URL("app/page.tsx", root), "utf8"),
+    readFile(new URL("app/api/student/route.ts", root), "utf8"),
+    readFile(new URL("supabase/migrations/20260929124850_add_student_job_choice_onboarding.sql", root), "utf8"),
+  ]);
+
+  assert.match(page, /직업을 선택하세요/);
+  assert.match(page, /할 수 있는 일들/);
+  assert.match(page, /needs_job_selection/);
+  assert.match(page, /selected\.description/);
+  assert.match(studentApi, /fo_student_choose_job/);
+  assert.match(migration, /basic_job='백수'/);
+  assert.match(migration, /delete from public\.feature_unlocks/);
+  assert.match(migration, /student_context_before_job_choice/);
+  assert.match(migration, /기본직업은 처음에 한 번만 직접 선택/);
+});
